@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+weather_runtime_cache.json
+*.png
+*.har
+.ztq_js/
+check_weather_ui.py
