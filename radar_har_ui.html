@@ -928,7 +928,12 @@
         state.activeFrameIndex = Math.max(0, getFrames().length - 1);
         renderWeather(data.current_weather || {}, data.hourly_forecast || []);
         renderRadar();
-        setMessage(`已刷新：${data.fetched_at}`, true);
+        if (data.upstream_errors?.length) {
+          setMessage(`部分数据源异常：${data.upstream_errors.map((item) => item.source).join("、")}`, false);
+          console.warn("upstream errors", data.upstream_errors);
+        } else {
+          setMessage(`已刷新：${data.fetched_at}`, true);
+        }
       } catch (error) {
         showError(error);
       } finally {
