@@ -792,6 +792,16 @@ def fetch_hourly_forecast(county_id: str, count: str) -> List[Dict[str, Any]]:
     return result
 
 
+def safe_fetch(label: str, errors: List[Dict[str, str]], func: Any, default: Any) -> Any:
+    try:
+        return func()
+    except Exception as exc:
+        message = f"{type(exc).__name__}: {exc}"
+        errors.append({"source": label, "error": message})
+        print(f"[upstream-error] {label}: {message}")
+        return default
+
+
 def api_latest(query: Dict[str, List[str]]) -> Dict[str, Any]:
     area_id = query.get("area_id", ["25169"])[0]
     weather_area = query.get("weather_area", ["32336"])[0]
@@ -801,12 +811,17 @@ def api_latest(query: Dict[str, List[str]]) -> Dict[str, Any]:
     radar_to = query.get("radar_to", [""])[0]
     station_ids = query.get("station_id", ["20002"])
 
-    mosaics = fetch_mosaic(area_id)
+    upstream_errors: List[Dict[str, str]] = []
+    mosaics = safe_fetch("fycx_fbt_ld", upstream_errors, lambda: fetch_mosaic(area_id), [])
     sequences = []
     for station_id in station_ids:
-        sequences.extend(fetch_sequence(station_id, count))
+        sequences.extend(safe_fetch(f"leida:{station_id}", upstream_errors, lambda station_id=station_id: fetch_sequence(station_id, count), []))
     unfiltered_count = len(sequences)
     sequences = filter_frames_by_time(sequences, radar_from, radar_to)
+    radar_groups = safe_fetch("leiDa_Group_List", upstream_errors, fetch_radar_groups, [])
+    current_weather = safe_fetch("sstq_grid_v2", upstream_errors, lambda: fetch_current_weather(weather_area), {})
+    hourly_forecast = safe_fetch("grid_forecast_new", upstream_errors, lambda: fetch_hourly_forecast(weather_area, forecast_count), [])
+    imagery = safe_fetch("ztq_img", upstream_errors, fetch_image_products, [])
 
     return {
         "ok": True,
@@ -822,12 +837,13 @@ def api_latest(query: Dict[str, List[str]]) -> Dict[str, Any]:
             "unfiltered_count": unfiltered_count,
             "filtered_count": len(sequences),
         },
-        "radar_groups": fetch_radar_groups(),
-        "current_weather": fetch_current_weather(weather_area),
-        "hourly_forecast": fetch_hourly_forecast(weather_area, forecast_count),
+        "radar_groups": radar_groups,
+        "current_weather": current_weather,
+        "hourly_forecast": hourly_forecast,
         "mosaics": mosaics,
         "sequences": sequences,
-        "imagery": fetch_image_products(),
+        "imagery": imagery,
+        "upstream_errors": upstream_errors,
     }
 
 
@@ -839,6 +855,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path in {"/", "/radar_har_ui.html"}:
                 self.send_file(ROOT / "radar_har_ui.html")
+            elif parsed.path == "/favicon.ico":
+                self.send_response(204)
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
             elif parsed.path == "/api/latest":
                 self.send_json(api_latest(query))
             elif parsed.path == "/api/search-stations":
@@ -886,6 +906,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_error(404, "Not found")
         except Exception as exc:
+            print(f"[request-error] {parsed.path}: {type(exc).__name__}: {exc}")
             self.send_json({"ok": False, "error": str(exc)}, status=500)
 
     def send_file(self, path: Path) -> None:
