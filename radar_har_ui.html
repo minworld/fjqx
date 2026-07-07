@@ -1,0 +1,1726 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>福建气象系统</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    :root {
+      --bg: #eef3f6;
+      --panel: rgba(255,255,255,.92);
+      --ink: #14212b;
+      --muted: #667684;
+      --line: #dbe4ea;
+      --accent: #176b87;
+      --accent-2: #0f766e;
+      --warn: #c45a1b;
+      --good: #15803d;
+      --soft: #e8f5f7;
+      --shadow: 0 18px 50px rgba(20,33,43,.12);
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 14px/1.5 "Inter", "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background:
+        linear-gradient(135deg, rgba(23,107,135,.12), transparent 34%),
+        linear-gradient(315deg, rgba(15,118,110,.10), transparent 30%),
+        var(--bg);
+    }
+    button, input, select {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 10px;
+      font: inherit;
+    }
+    button { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(20,33,43,.10); }
+    button.primary, .tab.active, .mode.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.icon { width: 40px; padding: 0; font-weight: 800; }
+    label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 20px; letter-spacing: 0; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 14px; }
+    a { color: var(--accent); word-break: break-all; }
+    .wrap { width: min(1480px, calc(100% - 28px)); margin: 0 auto; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+      background: rgba(238,243,246,.78);
+      border-bottom: 1px solid rgba(219,228,234,.8);
+    }
+    .topbar {
+      min-height: 76px;
+      display: grid;
+      grid-template-columns: auto minmax(320px, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 220px;
+    }
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      font-weight: 900;
+      background:
+        radial-gradient(circle at 34% 28%, rgba(255,255,255,.45), transparent 23%),
+        linear-gradient(145deg, #0f7c95, #1454a5 48%, #17a56b);
+      box-shadow: 0 10px 24px rgba(20,84,165,.22);
+    }
+    .brand-text { display: grid; gap: 1px; }
+    .brand-text small { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .searchbox { position: relative; display: grid; gap: 4px; }
+    .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+    .search-results {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 40;
+      max-height: 360px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    .search-results[hidden], [hidden] { display: none !important; }
+    .result-item {
+      width: 100%;
+      height: auto;
+      padding: 9px;
+      display: grid;
+      gap: 2px;
+      border: 0;
+      text-align: left;
+      background: transparent;
+    }
+    .result-item:hover { background: var(--soft); box-shadow: none; transform: none; }
+    .result-item span, .muted { color: var(--muted); }
+    main.wrap { display: grid; gap: 16px; padding: 16px 0 28px; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .modebar { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .mode { min-width: 112px; border-radius: 999px; }
+    .weather {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      min-width: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(245,250,252,.96)),
+        var(--panel);
+    }
+    .weather-dashboard {
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: minmax(320px, .82fr) minmax(620px, 1.18fr);
+      gap: 16px;
+      align-items: stretch;
+      min-width: 0;
+    }
+    .weather-now {
+      min-height: 190px;
+      padding: 20px 22px;
+      display: grid;
+      gap: 18px;
+      border: 1px solid rgba(219,228,234,.9);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(23,107,135,.16), transparent 48%),
+        linear-gradient(315deg, rgba(22,163,74,.11), transparent 42%),
+        #fff;
+      box-shadow: 0 14px 34px rgba(20,33,43,.08);
+      min-width: 0;
+    }
+    .place { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .temperature { display: flex; align-items: baseline; gap: 12px; }
+    .temperature strong { font-size: 64px; line-height: .95; letter-spacing: 0; }
+    .temperature span {
+      padding: 6px 10px;
+      border: 1px solid rgba(219,228,234,.9);
+      border-radius: 999px;
+      background: rgba(255,255,255,.74);
+      color: var(--muted);
+    }
+    .weather-metrics-panel {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      border: 1px solid rgba(219,228,234,.9);
+      border-radius: 8px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 14px 34px rgba(20,33,43,.06);
+      min-width: 0;
+    }
+    .metrics, .stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .metric, .mini-stat, .side-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 10px;
+    }
+    .weather-metrics-panel .metric {
+      min-height: 82px;
+      padding: 12px;
+      display: grid;
+      align-content: space-between;
+      border-color: rgba(219,228,234,.86);
+      background: linear-gradient(180deg, #fff, #f8fbfc);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .weather-metrics-panel .metric:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(20,33,43,.08);
+    }
+    .metric span, .mini-stat span { display: block; color: var(--muted); font-size: 12px; }
+    .weather-metrics-panel .metric span { font-size: 13px; }
+    .metric strong, .mini-stat strong { display: block; margin-top: 3px; font-size: 18px; }
+    .weather-metrics-panel .metric strong { font-size: 22px; line-height: 1.12; white-space: normal; overflow-wrap: anywhere; }
+    .weather-metrics-panel .metric strong .main { display: block; }
+    .weather-metrics-panel .metric strong .sub { display: block; margin-top: 1px; color: var(--muted); font-size: 17px; font-weight: 800; }
+    .forecast { padding: 0 18px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; overflow: hidden; }
+    .forecast-block {
+      padding: 14px;
+      border: 1px solid rgba(219,228,234,.9);
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      min-width: 0;
+      overflow: hidden;
+    }
+    .section-title, .weather-trend-head, .radar-title, .gis-title, .viewer-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    #weatherTrendMetric, #trendMetric { display: none; }
+    .metric-switch {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .metric-switch button {
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #fff;
+    }
+    .metric-switch button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .hour-strip {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 98px;
+      gap: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-height: none;
+      padding: 10px 2px 4px;
+      scrollbar-width: thin;
+      border-top: 1px solid rgba(219,228,234,.9);
+    }
+    .hour {
+      min-height: 118px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 6px;
+      align-content: stretch;
+      padding: 8px 9px;
+      border: 0;
+      border-right: 1px solid rgba(219,228,234,.86);
+      border-radius: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,252,.96));
+    }
+    .hour:first-child { border-left: 1px solid rgba(219,228,234,.86); border-radius: 7px 0 0 7px; }
+    .hour:last-child { border-radius: 0 7px 7px 0; }
+    .hour .time { font-weight: 900; font-size: 13px; }
+    .hour .wx { color: var(--accent); min-height: 0; font-weight: 900; font-size: 13px; }
+    .hour-main { display: grid; align-content: center; gap: 3px; }
+    .hour-temp { font-size: 18px; font-weight: 900; color: var(--ink); line-height: 1; }
+    .hour-rain { color: #2563eb; font-size: 12px; font-weight: 800; }
+    .hour-wind {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .wind-arrow {
+      width: 18px;
+      height: 18px;
+      display: inline-grid;
+      place-items: center;
+      color: #0f766e;
+      transform: rotate(var(--deg, 0deg));
+      transform-origin: 50% 50%;
+    }
+    .hour .hour-meta { display: none; }
+    .hour > small { display: none; }
+    .weather-trend {
+      padding: 16px;
+      border: 1px solid rgba(219,228,234,.94);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(20,33,43,.08);
+      min-width: 0;
+      overflow: hidden;
+    }
+    .weather-trend .trend-chart { min-height: 460px; }
+    .weather-trend .trend-chart svg { height: 460px; }
+    .trend-chart {
+      width: 100%;
+      min-height: 260px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+      position: relative;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .trend-chart.echart { height: 460px; padding: 4px 6px 0; }
+    .trend-chart svg { width: 100%; height: 260px; display: block; }
+    .trend-chart text { fill: var(--muted); font-size: 15px; }
+    .trend-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .weather-trend .trend-window { min-height: 78px; padding: 10px; }
+    .trend-window {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 8px;
+      min-height: 64px;
+    }
+    .trend-window span { display: block; color: var(--muted); font-size: 14px; }
+    .trend-window strong { display: block; margin-top: 4px; font-size: 18px; line-height: 1.45; }
+    .radar-head, .gis-head {
+      padding: 13px 14px;
+      display: grid;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251,252,253,.9);
+    }
+    .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+    .tab { height: 36px; border-radius: 999px; white-space: nowrap; }
+    .station-tab.active { background: var(--soft); color: #0e5068; border-color: #83bdc9; }
+    .radar-query { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)) auto; gap: 8px; align-items: end; }
+    .radar-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 620px; }
+    .viewer { padding: 14px; display: grid; grid-template-rows: auto minmax(360px, 1fr) auto; gap: 12px; min-width: 0; }
+    .image-stage {
+      position: relative;
+      min-height: 440px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: radial-gradient(circle at 30% 20%, #f8fbfd, #dfe9ee);
+      overflow: hidden;
+    }
+    .image-stage img { width: 100%; height: 100%; object-fit: contain; display: block; transition: opacity .22s ease, transform .22s ease; }
+    .timeline-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+    .frame-strip {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 92px;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px 2px 10px;
+      border-top: 2px solid #cfd9df;
+      scrollbar-width: thin;
+    }
+    .frame {
+      position: relative;
+      height: 48px;
+      padding: 10px 6px 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      text-align: center;
+    }
+    .frame::before { content: ""; position: absolute; top: -10px; left: 50%; width: 1px; height: 10px; background: #8fa1ac; }
+    .frame.active { color: var(--warn); border-color: var(--warn); background: #fff7ed; }
+    .frame span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .side, .gis-side {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      border-left: 1px solid var(--line);
+      background: rgba(251,252,253,.9);
+    }
+    .side-card { display: grid; gap: 8px; }
+    .kv { display: grid; gap: 6px; }
+    .kv div { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #edf1f4; }
+    .kv div:last-child { border-bottom: 0; padding-bottom: 0; }
+    .kv span { color: var(--muted); }
+    .kv strong { text-align: right; }
+    .gis-controls { display: grid; grid-template-columns: minmax(128px,.75fr) minmax(130px,.75fr) minmax(220px,1.2fr) auto; gap: 8px; }
+    .region-checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .region-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .region-check input { width: 14px; height: 14px; padding: 0; }
+    .gis-body { display: grid; grid-template-columns: minmax(720px, 1fr) 330px; min-height: 760px; background: #f4f8fa; }
+    .map-wrap { padding: 12px; display: grid; gap: 10px; grid-template-rows: minmax(640px, 1fr) auto; min-width: 0; }
+    .map {
+      min-height: 640px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #dbe8ec;
+      overflow: hidden;
+    }
+    .gis-side {
+      padding: 12px;
+      gap: 10px;
+      background: #f8fbfc;
+      overflow: auto;
+      max-height: 760px;
+    }
+    .gis-current-card {
+      padding: 14px;
+      border: 1px solid rgba(219,228,234,.95);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 12px 28px rgba(20,33,43,.08);
+    }
+    .gis-current-head { display: grid; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid #edf1f4; }
+    .gis-current-head h3 { font-size: 18px; }
+    .gis-current-meta { display: flex; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+    .gis-current-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .gis-current-grid .mini-stat {
+      min-height: 72px;
+      display: grid;
+      align-content: space-between;
+      background: linear-gradient(180deg, #fff, #f8fbfc);
+    }
+    .gis-current-grid .mini-stat strong { font-size: 20px; line-height: 1.15; }
+    .gis-current-grid .mini-stat strong .main,
+    .gis-current-grid .mini-stat strong .sub { display: block; }
+    .gis-current-grid .mini-stat strong .sub { margin-top: 2px; color: var(--muted); font-size: 16px; }
+    .gis-station-list-card { min-height: 0; }
+    .weather-marker { background: transparent; border: 0; }
+    .marker-wrap { position: relative; display: grid; place-items: center; transform: translate(-50%, -50%); }
+    .marker-dot {
+      border: 2px solid #fff;
+      box-shadow: 0 1px 7px rgba(0,0,0,.32);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .marker-dot { width: 100%; height: 100%; border-radius: 50%; }
+    .marker-wind {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      transform-origin: 50% 50%;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
+    }
+    .marker-wind::before {
+      content: "";
+      position: absolute;
+      left: 13px;
+      top: 5px;
+      width: 4px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--wind-color, #0f766e);
+    }
+    .marker-wind::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 1px;
+      width: 14px;
+      height: 14px;
+      background: var(--wind-color, #0f766e);
+      clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%);
+    }
+    .weather-marker.active .marker-dot, .weather-marker.active .marker-wind {
+      border-color: #17212b;
+      box-shadow: 0 0 0 4px rgba(23,107,135,.22), 0 2px 8px rgba(0,0,0,.35);
+      animation: pulse .9s ease-out;
+    }
+    @keyframes pulse { from { transform: scale(1.25); } to { transform: scale(1); } }
+    .marker-value-label {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 4px);
+      transform: translateX(-50%);
+      padding: 2px 6px;
+      border: 1px solid rgba(20,33,43,.12);
+      border-radius: 999px;
+      background: rgba(255,255,255,.95);
+      color: #17212b;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(20,33,43,.14);
+      pointer-events: none;
+    }
+    .legend { display: grid; gap: 8px; color: var(--muted); font-size: 12px; }
+    .legend-scale { display: grid; gap: 5px; }
+    .legend-gradient {
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(20,33,43,.12);
+      box-shadow: inset 0 1px 2px rgba(20,33,43,.12);
+    }
+    .legend-ticks, .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .legend-labels span { color: var(--ink); font-weight: 700; }
+    .legend-note { line-height: 1.45; }
+    .chip { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .feature-list, .trend-list { display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+    .feature {
+      width: 100%;
+      height: auto;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 10px;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      text-align: left;
+    }
+    .feature.active { border-color: var(--accent); background: var(--soft); }
+    .notice { padding: 10px 12px; border-left: 4px solid var(--warn); border-radius: 6px; background: #fff7ed; color: #5c3500; }
+    .notice.good { border-left-color: var(--good); background: #effaf4; color: #0b4f31; }
+    @media (max-width: 1050px) {
+      .topbar, .weather, .radar-body, .gis-body, .gis-controls, .radar-query { grid-template-columns: 1fr; }
+      .brand { min-width: 0; }
+      .weather-dashboard { grid-template-columns: 1fr; }
+      .weather-metrics-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .weather-now, .side, .gis-side { border-left: 0; border-right: 0; }
+      .map { min-height: 470px; }
+      .temperature strong { font-size: 58px; }
+      .trend-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .wrap { width: min(100% - 18px, 1480px); }
+      .weather-dashboard, .forecast { padding-left: 10px; padding-right: 10px; }
+      .weather-metrics-panel { grid-template-columns: 1fr; }
+      .weather-trend .trend-chart, .trend-chart.echart { height: 390px; min-height: 390px; }
+      .temperature { display: grid; gap: 8px; }
+      .temperature strong { font-size: 50px; }
+      .metric-switch { justify-content: flex-start; }
+      .weather-trend-head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap topbar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">闽</div>
+        <div class="brand-text">
+          <h1>福建气象系统</h1>
+          <small>Fujian Meteorology</small>
+        </div>
+      </div>
+      <div class="searchbox">
+        <label for="stationSearch">天气站点 / 地点搜索</label>
+        <div class="search-row">
+          <input id="stationSearch" placeholder="输入地点、街道、站点名，例如 双十中学 / 厦门">
+          <button id="locateMe" title="根据 GPS 推荐最近站点">GPS</button>
+        </div>
+        <input id="weatherArea" value="32336" hidden>
+        <div id="searchResults" class="search-results" hidden></div>
+      </div>
+      <label>自动刷新
+        <select id="autoRefresh">
+          <option value="0">关闭</option>
+          <option value="60">60 秒</option>
+          <option value="180">3 分钟</option>
+          <option value="300">5 分钟</option>
+        </select>
+      </label>
+      <button id="refresh" class="primary">刷新</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <div class="modebar">
+        <button id="weatherMode" class="mode active">天气实况</button>
+        <button id="gisMode" class="mode">天气地图</button>
+        <button id="cloudMode" class="mode">气象云图</button>
+        <span id="message" class="tag" hidden>等待加载</span>
+      </div>
+      <section id="weatherPanel" class="weather">
+        <div class="weather-dashboard">
+          <div class="weather-now">
+            <div class="place">
+              <div>
+                <h2 id="weatherPlace">-</h2>
+                <p id="weatherUpdated" class="muted">-</p>
+              </div>
+              <span id="weatherStation" class="tag">-</span>
+            </div>
+            <div class="temperature"><strong id="weatherTemp">-</strong><span>体感 <b id="bodyTemp">-</b></span></div>
+          </div>
+          <div class="weather-metrics-panel">
+            <div class="metric"><span>湿度</span><strong id="humidity">-</strong></div>
+            <div class="metric"><span>降雨量</span><strong id="rainfall">-</strong></div>
+            <div class="metric"><span>气压</span><strong id="pressure">-</strong></div>
+            <div class="metric"><span>风速风向</span><strong id="wind">-</strong></div>
+          </div>
+        </div>
+        <div class="forecast">
+          <div class="forecast-block">
+            <div class="section-title"><h2>未来逐小时</h2><span class="muted">网格预报</span></div>
+            <div id="hourStrip" class="hour-strip"></div>
+          </div>
+          <div class="weather-trend">
+            <div class="weather-trend-head">
+              <h2>当前位置过去 24 小时</h2>
+              <select id="weatherTrendMetric">
+                <option value="temperature">气温</option>
+                <option value="humidity">湿度</option>
+                <option value="pressure">气压</option>
+                <option value="wind">风速</option>
+                <option value="rainfall">降雨量</option>
+              </select>
+              <div id="weatherTrendTabs" class="metric-switch"></div>
+            </div>
+            <div id="weatherTrendChart" class="trend-chart"><span class="muted">加载天气后显示</span></div>
+            <div id="weatherTrendSummary" class="trend-list"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="radarPanel" class="panel radar-shell" hidden>
+      <div class="radar-head">
+        <div class="radar-title">
+          <h2>雷达与云图</h2>
+          <span id="radarStatus" class="muted">最近 20 帧</span>
+        </div>
+        <div class="tabs">
+          <button id="productRadar" class="tab active">天气雷达</button>
+          <button id="productImagery" class="tab">综合云图</button>
+        </div>
+        <div id="groupTabs" class="tabs"></div>
+        <div id="stationTabs" class="tabs"></div>
+        <div class="radar-query">
+          <label>历史帧数
+            <select id="radarCount">
+              <option value="20">最近 20 帧</option>
+              <option value="60">最近 60 帧</option>
+              <option value="120">最近 120 帧</option>
+              <option value="240">最近 240 帧</option>
+            </select>
+          </label>
+          <button id="radarSearch">查询</button>
+        </div>
+      </div>
+      <div class="radar-body">
+        <div class="viewer">
+          <div class="viewer-info">
+            <div><strong id="activeStationName">-</strong><div id="activeFrameTime" class="muted">-</div></div>
+            <span id="activeStationId" class="tag">-</span>
+          </div>
+          <div class="image-stage"><img id="mainRadarImage" alt=""></div>
+          <div class="timeline-row">
+            <button id="play" class="icon" title="播放/暂停">▶</button>
+            <div id="frameStrip" class="frame-strip"></div>
+          </div>
+        </div>
+        <aside class="side" hidden>
+          <div class="side-card">
+            <h3>当前产品</h3>
+            <div class="kv">
+              <div><span>类型</span><strong id="sideProduct">天气雷达</strong></div>
+              <div><span>分组</span><strong id="sideGroup">-</strong></div>
+              <div><span>站点</span><strong id="sideStation">-</strong></div>
+              <div><span>站点 ID</span><strong id="sideStationId">-</strong></div>
+              <div><span>帧数</span><strong id="sideFrameCount">-</strong></div>
+            </div>
+          </div>
+          <div class="side-card">
+            <h3>当前帧</h3>
+            <div class="kv">
+              <div><span>时间</span><strong id="sideFrameTime">-</strong></div>
+              <div><span>序号</span><strong id="sideFrameIndex">-</strong></div>
+            </div>
+            <a id="sideImageUrl" href="#" target="_blank" rel="noreferrer">原始图片地址</a>
+          </div>
+          <div class="side-card">
+            <h3>天气站点地点</h3>
+            <div class="kv">
+              <div><span>天气站</span><strong id="sideWeatherStation">-</strong></div>
+              <div><span>区域</span><strong id="sideWeatherArea">-</strong></div>
+              <div><span>经纬度</span><strong id="sideWeatherLonLat">-</strong></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="gisPanel" class="panel gis-shell" hidden>
+      <div class="gis-head">
+        <div class="gis-title">
+          <h2>GIS 自动气象站实况</h2>
+          <span id="gisStatus" class="muted" hidden></span>
+        </div>
+        <div class="gis-controls">
+          <select id="gisCity" hidden><option value="">加载中...</option></select>
+          <select id="gisMetric">
+            <option value="temperature">气温</option>
+            <option value="rainfall">降雨量</option>
+            <option value="humidity">湿度</option>
+            <option value="pressure">气压</option>
+            <option value="wind">风速风向</option>
+          </select>
+          <select id="baseMap">
+            <option value="amap">高德地图</option>
+            <option value="esri">Esri 影像</option>
+            <option value="carto">Carto 浅色</option>
+            <option value="osm">OpenStreetMap</option>
+          </select>
+          <input id="gisKeyword" placeholder="过滤站点或区域，例如 厦门 / 湖里 / 双十">
+          <select id="gisLimit" hidden>
+            <option value="scope">当前范围全部</option>
+          </select>
+          <button id="gisRefresh" class="primary">加载 GIS</button>
+        </div>
+        <div id="gisRegionChecks" class="region-checks"></div>
+      </div>
+      <div class="gis-body">
+        <div class="map-wrap">
+          <div id="gisMap" class="map"></div>
+          <div id="coordNote" class="muted" hidden></div>
+          <div id="gisLegend" class="legend"></div>
+        </div>
+        <aside class="gis-side">
+          <div class="gis-current-card">
+            <div class="gis-current-head">
+              <h3 id="gisName">-</h3>
+              <div class="gis-current-meta">
+                <span id="gisStation">-</span>
+                <span id="gisUpdated">-</span>
+              </div>
+              <span id="gisLonLat" class="muted">-</span>
+            </div>
+            <div class="gis-current-grid">
+              <div class="mini-stat"><span>气温</span><strong id="gisTemp">-</strong></div>
+              <div class="mini-stat"><span>湿度</span><strong id="gisHumidity">-</strong></div>
+              <div class="mini-stat"><span>降雨量</span><strong id="gisRain">-</strong></div>
+              <div class="mini-stat"><span>风速风向</span><strong id="gisWind">-</strong></div>
+            </div>
+          </div>
+          <div hidden>
+            <select id="trendMetric">
+              <option value="temperature">气温</option>
+              <option value="humidity">湿度</option>
+              <option value="pressure">气压</option>
+              <option value="wind">风速</option>
+              <option value="rainfall">降雨量</option>
+            </select>
+            <div id="officialTrendTabs"></div>
+            <div id="officialTrendChart"></div>
+            <div id="officialTrend"></div>
+          </div>
+          <div class="side-card gis-station-list-card">
+            <h3>当前点位</h3>
+            <div id="featureList" class="feature-list"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/echarts@5.5.1/dist/echarts.min.js';"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const TREND_METRICS = [
+      ["temperature", "气温"],
+      ["humidity", "湿度"],
+      ["pressure", "气压"],
+      ["wind", "风速"],
+      ["rainfall", "降雨量"],
+    ];
+    const state = {
+      data: null,
+      groups: [],
+      activeGroupId: null,
+      activeStationId: "20002",
+      activeFrameIndex: 0,
+      product: "radar",
+      playTimer: null,
+      refreshTimer: null,
+      mode: "weather",
+      weatherHistory: null,
+      stationHistory: null,
+      charts: {},
+      gis: { features: [], selectedStationId: null, cities: [], cityIndex: 0, map: null, markers: null, tileLayer: null, shouldFitBounds: true, baseMap: "amap" },
+    };
+
+    $("refresh").addEventListener("click", () => state.mode === "gis" ? loadGis() : refreshLatest());
+    $("radarSearch").addEventListener("click", () => { stopPlayback(); refreshLatest(); });
+    $("play").addEventListener("click", togglePlayback);
+    $("autoRefresh").addEventListener("change", setupAutoRefresh);
+    $("stationSearch").addEventListener("input", debounce(searchStations, 220));
+    $("stationSearch").addEventListener("focus", () => { if ($("searchResults").innerHTML.trim()) $("searchResults").hidden = false; });
+    $("locateMe").addEventListener("click", locateNearest);
+    $("weatherMode").addEventListener("click", () => switchMode("weather"));
+    $("gisMode").addEventListener("click", () => switchMode("gis"));
+    $("cloudMode").addEventListener("click", () => switchMode("cloud"));
+    $("productRadar").addEventListener("click", () => setProduct("radar"));
+    $("productImagery").addEventListener("click", () => setProduct("imagery"));
+    $("gisRefresh").addEventListener("click", loadGis);
+    $("gisMetric").addEventListener("change", () => renderGis(false));
+    $("baseMap").addEventListener("change", () => {
+      setBaseMap($("baseMap").value);
+      renderGis(false);
+    });
+    $("trendMetric").addEventListener("change", renderOfficialTrend);
+    $("weatherTrendMetric").addEventListener("change", renderWeatherTrend);
+    window.addEventListener("resize", debounce(() => Object.values(state.charts).forEach((chart) => chart?.resize()), 120));
+    $("gisCity").addEventListener("change", () => {
+      $("gisRegionChecks").querySelectorAll("input").forEach((input) => { input.checked = false; });
+      state.gis.cityIndex = Math.max(0, state.gis.cities.findIndex((scope) => scope.value === $("gisCity").value));
+      loadGis();
+    });
+    $("gisRegionChecks").addEventListener("change", (event) => {
+      if (event.target.matches("input")) loadGis();
+    });
+    $("gisPrev")?.addEventListener("click", () => stepGisCity(-1));
+    $("gisNext")?.addEventListener("click", () => stepGisCity(1));
+    document.addEventListener("click", (event) => { if (!event.target.closest(".searchbox")) $("searchResults").hidden = true; });
+    setupTrendMetricTabs();
+    refreshLatest();
+
+    function setupTrendMetricTabs() {
+      bindTrendMetricTabs("weatherTrendTabs", "weatherTrendMetric", renderWeatherTrend);
+      bindTrendMetricTabs("officialTrendTabs", "trendMetric", renderOfficialTrend);
+    }
+
+    function bindTrendMetricTabs(containerId, selectId, renderFn) {
+      const container = $(containerId);
+      const select = $(selectId);
+      container.innerHTML = TREND_METRICS.map(([value, label]) => `
+        <button type="button" class="${select.value === value ? "active" : ""}" data-metric="${value}">${label}</button>
+      `).join("");
+      container.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => {
+          select.value = button.dataset.metric;
+          container.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
+          renderFn();
+        });
+      });
+    }
+
+    function switchMode(mode) {
+      state.mode = mode;
+      $("weatherMode").classList.toggle("active", mode === "weather");
+      $("gisMode").classList.toggle("active", mode === "gis");
+      $("cloudMode").classList.toggle("active", mode === "cloud");
+      $("weatherPanel").hidden = mode !== "weather";
+      $("radarPanel").hidden = mode !== "cloud";
+      $("gisPanel").hidden = mode !== "gis";
+      if (mode === "gis") {
+        if (!state.gis.cities.length) loadGisCities().then(loadGis).catch(showError);
+        else if (!state.gis.features.length) loadGis();
+        setTimeout(() => state.gis.map?.invalidateSize(), 120);
+      } else if (mode === "cloud") {
+        setProduct("radar");
+      } else if (mode === "weather") {
+        setTimeout(() => state.charts.weatherTrendChart?.resize(), 120);
+      }
+    }
+
+    function setProduct(product) {
+      state.product = product;
+      state.activeFrameIndex = Math.max(0, getFrames().length - 1);
+      $("productRadar").classList.toggle("active", product === "radar");
+      $("productImagery").classList.toggle("active", product === "imagery");
+      $("groupTabs").hidden = product !== "radar";
+      $("stationTabs").hidden = product !== "radar";
+      renderRadar();
+    }
+
+    async function refreshLatest() {
+      const params = new URLSearchParams();
+      params.set("station_id", state.activeStationId);
+      params.set("count", $("radarCount").value || "20");
+      params.set("area_id", "25169");
+      params.set("weather_area", $("weatherArea").value || "32336");
+      params.set("forecast_count", "20");
+      $("refresh").disabled = true;
+      setMessage("正在加载最新天气和图像...", false);
+      try {
+        const data = await fetchJson(`/api/latest?${params}`);
+        state.data = data;
+        state.groups = data.radar_groups || [];
+        ensureActiveGroup();
+        renderTabs();
+        state.activeFrameIndex = Math.max(0, getFrames().length - 1);
+        renderWeather(data.current_weather || {}, data.hourly_forecast || []);
+        renderRadar();
+        setMessage(`已刷新：${data.fetched_at}`, true);
+      } catch (error) {
+        showError(error);
+      } finally {
+        $("refresh").disabled = false;
+      }
+    }
+
+    function renderWeather(now, forecast) {
+      $("weatherPlace").textContent = now.station_name || now.city || "-";
+      $("weatherUpdated").textContent = `${now.city || ""} ${now.updated || ""}`.trim() || "-";
+      $("weatherStation").textContent = now.station_id || "-";
+      $("weatherTemp").textContent = val(now.temperature, "°C");
+      $("bodyTemp").textContent = val(now.body_temperature, "°C");
+      $("humidity").textContent = val(now.humidity, "%");
+      $("rainfall").textContent = val(now.rainfall, "mm");
+      $("pressure").textContent = val(now.pressure, "hPa");
+      $("wind").innerHTML = `<span class="main">${escapeHtml(shortWindDir(now.wind_dir) || "-")}</span><span class="sub">${escapeHtml(val(now.wind, "m/s"))}</span>`;
+      $("sideWeatherStation").textContent = now.station_name || now.station_id || "-";
+      $("sideWeatherArea").textContent = now.city || now.area || "-";
+      $("sideWeatherLonLat").textContent = now.lon && now.lat ? `${now.lon}, ${now.lat}` : "-";
+      $("hourStrip").innerHTML = (forecast || []).map((item) => `
+        <div class="hour">
+          <div class="time">${escapeHtml(item.time || shortDate(item.datetime) || "-")}</div>
+          <div class="wx">${escapeHtml(item.weather || "-")}</div>
+          <div class="hour-main">
+            <div class="hour-temp">${val(item.temperature, "°C")}</div>
+            <div class="hour-rain">${val(item.rainfall, "mm")}</div>
+          </div>
+          <div class="hour-wind">
+            <span class="wind-arrow" style="--deg:${windDirectionDeg(item.wind_dir)}deg">↑</span>
+            <span>${escapeHtml(shortWindDir(item.wind_dir) || "-")} ${val(item.wind_speed, "m/s")}</span>
+          </div>
+          <div class="hour-meta">
+            <strong>${val(item.temperature, "°C")} · ${val(item.rainfall, "mm")}</strong>
+            <small>${escapeHtml(shortWindDir(item.wind_dir) || "")} ${val(item.wind_speed, "m/s")}</small>
+          </div>
+          <small>${val(item.temperature, "°C")} · ${val(item.rainfall, "mm")}</small>
+          <small>${escapeHtml(item.wind_dir || "")} ${val(item.wind_speed, "m/s")}</small>
+        </div>`).join("") || `<div class="notice">暂无逐小时预报。</div>`;
+      if (now.station_id) loadWeatherTrend(now.station_id);
+    }
+
+    async function loadWeatherTrend(stationId) {
+      $("weatherTrendChart").innerHTML = `<span class="muted">正在加载过去 24 小时...</span>`;
+      try {
+        state.weatherHistory = await fetchJson(`/api/weather-history?station_id=${encodeURIComponent(stationId)}&metrics=temperature,humidity,pressure,wind,rainfall`);
+        renderWeatherTrend();
+      } catch (error) {
+        $("weatherTrendChart").innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    function renderWeatherTrend() {
+      const metric = $("weatherTrendMetric").value;
+      const trend = state.weatherHistory?.trends?.[metric] || state.weatherHistory?.metrics?.[metric];
+      renderTrendChart("weatherTrendChart", trend, metric);
+      $("weatherTrendSummary").innerHTML = renderTrendSummaryOnly(trend, metric, state.weatherHistory?.realtime);
+    }
+
+    function renderTabs() {
+      $("groupTabs").innerHTML = state.groups.map((group) => `
+        <button class="tab ${String(group.id) === String(state.activeGroupId) ? "active" : ""}" data-group="${escapeAttr(group.id)}">${escapeHtml(group.name || group.id)}</button>
+      `).join("");
+      $("groupTabs").querySelectorAll("button").forEach((button) => button.addEventListener("click", () => {
+        state.activeGroupId = button.dataset.group;
+        const first = groupStations(activeGroup())[0]?.station_id;
+        if (first) state.activeStationId = first;
+        renderTabs();
+        refreshLatest();
+      }));
+      const stations = groupStations(activeGroup());
+      $("stationTabs").innerHTML = stations.map((station) => {
+        return `<button class="tab station-tab ${String(station.station_id) === String(state.activeStationId) ? "active" : ""}" data-station="${escapeAttr(station.station_id)}">${escapeHtml(station.station_name || station.station_id)}</button>`;
+      }).join("");
+      $("stationTabs").querySelectorAll("button").forEach((button) => button.addEventListener("click", () => {
+        state.activeStationId = button.dataset.station;
+        refreshLatest();
+      }));
+    }
+
+    function renderRadar() {
+      const frames = getFrames();
+      const current = frames[state.activeFrameIndex] || frames[frames.length - 1];
+      const station = findStation(state.activeStationId);
+      const group = activeGroup();
+      const isImagery = state.product === "imagery";
+      $("activeStationName").textContent = isImagery ? "综合云图" : (station?.station_name || state.activeStationId);
+      $("activeStationId").textContent = isImagery ? "ztq_img" : state.activeStationId;
+      $("sideProduct").textContent = isImagery ? "综合云图" : "天气雷达";
+      $("sideGroup").textContent = isImagery ? "-" : (group?.name || "-");
+      $("sideStation").textContent = isImagery ? "综合云图" : (station?.station_name || state.activeStationId);
+      $("sideStationId").textContent = isImagery ? "ztq_img" : state.activeStationId;
+      $("sideFrameCount").textContent = frames.length ? `${frames.length} 帧` : "-";
+      $("radarStatus").textContent = isImagery ? "源站图像产品" : `最近 ${frames.length || 0} 帧`;
+      if (!current) {
+        $("mainRadarImage").removeAttribute("src");
+        $("activeFrameTime").textContent = isImagery ? "源站暂无可用云图" : "暂无图片";
+        $("frameStrip").innerHTML = `<div class="notice">${isImagery ? "HAR 中只发现 ztq_img 图像接口，当前源站未返回可显示帧。" : "当前查询范围暂无雷达帧。源站 leida 接口只返回最近 N 帧。"}</div>`;
+        return;
+      }
+      $("mainRadarImage").src = current.proxy || current.url;
+      $("activeFrameTime").textContent = current.time || "-";
+      $("sideFrameTime").textContent = current.time || "-";
+      $("sideFrameIndex").textContent = `${state.activeFrameIndex + 1} / ${frames.length}`;
+      $("sideImageUrl").href = current.url || "#";
+      $("frameStrip").innerHTML = frames.map((frame, index) => `
+        <button class="frame ${index === state.activeFrameIndex ? "active" : ""}" data-index="${index}">
+          <span>${escapeHtml(formatRadarTick(frame.time || String(index + 1)))}</span>
+        </button>`).join("");
+      $("frameStrip").querySelectorAll(".frame").forEach((button) => button.addEventListener("click", () => {
+        state.activeFrameIndex = Number(button.dataset.index);
+        renderRadar();
+      }));
+    }
+
+    function getFrames() {
+      return state.product === "imagery" ? (state.data?.imagery || []) : (state.data?.sequences || []);
+    }
+
+    async function loadGisCities() {
+      const data = await fetchJson("/api/weather-cities");
+      const cityRows = data.cities || [];
+      const cities = cityRows.map((city) => ({
+        kind: "city",
+        value: `city:${city.name}`,
+        label: city.name,
+        name: city.name,
+        cities: [city.name],
+        count: city.count,
+      }));
+      state.gis.cities = cities;
+      const xiamenIndex = Math.max(0, state.gis.cities.findIndex((city) => city.name === "厦门"));
+      state.gis.cityIndex = xiamenIndex;
+      $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(scope.label)} (${scope.count})</option>`).join("");
+      $("gisRegionChecks").innerHTML = state.gis.cities.map((scope, index) => `
+        <label class="region-check">
+          <input type="checkbox" value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "checked" : ""}>
+          ${escapeHtml(scope.label)} (${scope.count})
+        </label>`).join("");
+    }
+
+    function stepGisCity(offset) {
+      if (!state.gis.cities.length) return;
+      state.gis.cityIndex = (state.gis.cityIndex + offset + state.gis.cities.length) % state.gis.cities.length;
+      $("gisCity").value = state.gis.cities[state.gis.cityIndex].value;
+      loadGis();
+    }
+
+    async function loadGis() {
+      if (!state.gis.cities.length) await loadGisCities();
+      const scope = selectedGisScope();
+      const limit = Math.max(1, Number(scope?.count || 600));
+      const params = new URLSearchParams({ limit: String(limit) });
+      const realtimeLimit = Math.min(limit, 500);
+      params.set("realtime_limit", String(realtimeLimit));
+      params.set("hide_empty", "1");
+      if (scope?.cities?.length === 1) params.set("city", scope.cities[0]);
+      else if (scope?.cities?.length > 1) params.set("cities", scope.cities.join(","));
+      if ($("gisKeyword").value.trim()) params.set("q", $("gisKeyword").value.trim());
+      $("gisRefresh").disabled = true;
+      try {
+        const data = await fetchJson(`/api/gis-current?${params}`);
+        state.gis.features = data.features || [];
+        state.gis.selectedStationId = state.gis.features[0]?.station_id || null;
+        state.stationHistory = null;
+        state.gis.shouldFitBounds = true;
+        renderGis(true);
+      } catch (error) {
+        showError(error);
+      } finally {
+        $("gisRefresh").disabled = false;
+      }
+    }
+
+    function renderGis(allowFit) {
+      renderLeafletGis(allowFit);
+      renderGisListAndSelection();
+      renderGisLegend();
+    }
+
+    function renderLeafletGis(allowFit) {
+      if (!state.gis.map) {
+        state.gis.map = L.map("gisMap", { zoomControl: true, scrollWheelZoom: true, attributionControl: true }).setView([26.08, 118.30], 7);
+        state.gis.markers = L.layerGroup().addTo(state.gis.map);
+        state.gis.map.on("zoomend", () => renderLeafletGis(false));
+        setBaseMap($("baseMap").value || "amap");
+      }
+      state.gis.markers.clearLayers();
+      const metric = $("gisMetric").value;
+      const showLabel = state.gis.map.getZoom() >= 11;
+      const bounds = [];
+      for (const feature of state.gis.features) {
+        const lat = Number(feature.lat), lon = Number(feature.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const displayCoord = displayLonLat(lon, lat);
+        const value = metricValue(feature, metric);
+        const active = feature.station_id === state.gis.selectedStationId;
+        const size = metric === "wind" ? Math.max(22, Math.min(36, 20 + Number(value || 0) * 3)) : (active ? 22 : 15);
+        const label = showLabel ? `<span class="marker-value-label">${escapeHtml(formatMetricValue(feature, metric))}</span>` : "";
+        const color = metricColor(metric, value);
+        const deg = windDirectionDeg(currentOf(feature).wind_dir);
+        const shape = metric === "wind"
+          ? `<div class="marker-wind" style="--wind-color:${color};transform:rotate(${deg}deg) scale(${Math.max(.85, size / 30)})"></div>`
+          : `<div class="marker-dot" style="width:${size}px;height:${size}px;background:${color}"></div>`;
+        const icon = L.divIcon({
+          className: `weather-marker ${active ? "active" : ""}`,
+          html: `<div class="marker-wrap">${shape}${label}</div>`,
+          iconSize: [size, size],
+          iconAnchor: [0, 0],
+        });
+        const marker = L.marker([displayCoord.lat, displayCoord.lon], { icon }).addTo(state.gis.markers);
+        marker.bindTooltip(`${escapeHtml(feature.station_name || feature.name || feature.station_id)}<br>${escapeHtml(formatMetricValue(feature, metric))}`);
+        marker.on("click", () => selectGisStation(feature.station_id));
+        bounds.push([displayCoord.lat, displayCoord.lon]);
+      }
+      if (allowFit && state.gis.shouldFitBounds && bounds.length) {
+        state.gis.map.fitBounds(bounds, { padding: [28, 28], maxZoom: 11 });
+        state.gis.shouldFitBounds = false;
+      }
+      setTimeout(() => state.gis.map.invalidateSize(), 60);
+    }
+
+    function selectGisStation(stationId) {
+      state.gis.selectedStationId = stationId;
+      renderGis(false);
+    }
+
+    function renderGisListAndSelection() {
+      const metric = $("gisMetric").value;
+      $("featureList").innerHTML = state.gis.features.slice(0, 260).map((feature) => `
+        <button class="feature ${feature.station_id === state.gis.selectedStationId ? "active" : ""}" data-station="${escapeAttr(feature.station_id)}">
+          <span><strong>${escapeHtml(feature.station_name || feature.name || feature.station_id)}</strong><br><small>${escapeHtml(feature.city || feature.area_name || "")}</small></span>
+          <b>${escapeHtml(formatMetricValue(feature, metric))}</b>
+        </button>`).join("") || `<div class="notice">暂无自动站点。</div>`;
+      $("featureList").querySelectorAll(".feature").forEach((button) => button.addEventListener("click", () => selectGisStation(button.dataset.station)));
+      const f = selectedFeature();
+      const current = currentOf(f);
+      $("gisName").textContent = f?.station_name || f?.name || "-";
+      $("gisStation").textContent = f?.station_id || "-";
+      $("gisUpdated").textContent = current?.updated || f?.updated || "-";
+      $("gisLonLat").textContent = f?.lon && f?.lat ? `${f.lon}, ${f.lat}` : "-";
+      $("gisTemp").textContent = val(current?.temperature, "°C");
+      $("gisHumidity").textContent = val(current?.humidity, "%");
+      $("gisRain").textContent = val(current?.rainfall, "mm");
+      $("gisWind").innerHTML = `<span class="main">${escapeHtml(shortWindDir(current?.wind_dir) || "-")}</span><span class="sub">${escapeHtml(val(current?.wind, "m/s"))}</span>`;
+    }
+
+    async function loadOfficialTrend(stationId) {
+      $("officialTrendChart").innerHTML = `<span class="muted">正在加载过去 24 小时...</span>`;
+      try {
+        state.stationHistory = await fetchJson(`/api/weather-history?station_id=${encodeURIComponent(stationId)}&metrics=temperature,humidity,pressure,wind,rainfall`);
+        renderOfficialTrend();
+      } catch (error) {
+        $("officialTrendChart").innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    function renderOfficialTrend() {
+      const metric = $("trendMetric").value;
+      const trend = state.stationHistory?.trends?.[metric] || state.stationHistory?.metrics?.[metric];
+      renderTrendChart("officialTrendChart", trend, metric);
+      $("officialTrend").innerHTML = renderTrendRows(trend, metric, state.stationHistory?.realtime);
+    }
+
+    function extractTrendRows(trend) {
+      const source = trend?.points || trend?.sk_list || trend?.data || (Array.isArray(trend) ? trend : []);
+      return source.map((p) => ({
+        time: p.fulldt || p.dt || p.time || p.sk_time || p.yb_time || "",
+        value: parseMetricNumber(p.val ?? p.value),
+        windDir: p.wind_dir,
+      })).filter((p) => Number.isFinite(p.value));
+    }
+
+    function renderTrendChart(containerId, trend, metric) {
+      const el = $(containerId);
+      const rows = extractTrendRows(trend);
+      if (!rows.length) {
+        disposeChart(containerId);
+        el.classList.remove("echart");
+        el.innerHTML = `<div class="notice">No valid data in the past 24 hours.</div>`;
+        return;
+      }
+      if (!window.echarts) {
+        disposeChart(containerId);
+        el.classList.remove("echart");
+        el.innerHTML = renderTrendSvg(trend, metric);
+        return;
+      }
+
+      el.classList.add("echart");
+      disposeChart(containerId);
+      el.innerHTML = "";
+      const chart = echarts.init(el, null, { renderer: "canvas" });
+      state.charts[containerId] = chart;
+      const info = metricInfo(metric);
+      const values = rows.map((row) => row.value);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const isRain = metric === "rainfall";
+      const isNonNegative = ["rainfall", "wind", "humidity"].includes(metric);
+      const yPadding = Math.max((max - min) * .12, metric === "rainfall" ? .1 : .5);
+      const yMin = isNonNegative ? 0 : Math.floor((min - yPadding) * 10) / 10;
+      const yMax = metric === "humidity" ? Math.min(100, Math.ceil((max + yPadding) * 10) / 10) : Math.ceil((max + yPadding) * 10) / 10;
+      const chartValues = values.map((value) => isNonNegative ? Math.max(0, value) : value);
+      const lineColor = isRain ? "#2563eb" : metric === "humidity" ? "#0891b2" : metric === "pressure" ? "#7c3aed" : metric === "wind" ? "#16a34a" : "#e11d48";
+      const areaColor = isRain ? "rgba(37,99,235,.16)" : metric === "humidity" ? "rgba(8,145,178,.15)" : metric === "pressure" ? "rgba(124,58,237,.14)" : metric === "wind" ? "rgba(22,163,74,.14)" : "rgba(225,29,72,.14)";
+      chart.setOption({
+        animationDuration: 650,
+        animationEasing: "cubicOut",
+        grid: { left: 58, right: 30, top: 68, bottom: 88, containLabel: true },
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: "rgba(15,23,42,.92)",
+          borderWidth: 0,
+          textStyle: { color: "#fff" },
+          axisPointer: { type: "line", lineStyle: { color: "rgba(15,95,120,.35)", width: 2 } },
+          formatter: (items) => {
+            const item = items[0];
+            const row = rows[item.dataIndex] || {};
+            const windDir = metric === "wind" ? `${formatWindDirFromTrend(row)} ` : "";
+            return `${escapeHtml(row.time || "-")}<br>${escapeHtml(info.label)}: ${escapeHtml(windDir)}${formatNumber(row.value)}${info.unit}`;
+          },
+        },
+        xAxis: {
+          type: "category",
+          boundaryGap: isRain,
+          data: rows.map((row) => row.time),
+          axisTick: { show: false },
+          axisLine: { lineStyle: { color: "#dbe4ea" } },
+          axisLabel: { color: "#5f6b76", fontSize: 12, interval: Math.max(0, Math.ceil(rows.length / 8) - 1), margin: 12 },
+        },
+        yAxis: {
+          type: "value",
+          min: yMin,
+          max: yMax,
+          axisLabel: { color: "#5f6b76", formatter: `{value}${info.unit}` },
+          splitLine: { lineStyle: { color: "#edf1f4" } },
+        },
+        dataZoom: [
+          { type: "inside", start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true },
+          { type: "slider", start: 0, end: 100, height: 24, bottom: 24, borderColor: "#dbe4ea", fillerColor: "rgba(23,107,135,.18)", handleStyle: { color: "#176b87" }, textStyle: { color: "#667684" } },
+        ],
+        series: [{
+          name: info.label,
+          type: isRain ? "bar" : "line",
+          data: chartValues,
+          smooth: !isRain,
+          symbol: "circle",
+          symbolSize: 8,
+          barWidth: "52%",
+          lineStyle: { width: 4, color: lineColor },
+          itemStyle: { color: lineColor, borderColor: "#fff", borderWidth: 2 },
+          areaStyle: isRain ? undefined : { color: areaColor },
+          label: {
+            show: true,
+            position: "top",
+            distance: metric === "wind" ? 8 : 6,
+            color: "#17212b",
+            fontSize: 11,
+            fontWeight: 800,
+            formatter: (params) => {
+              const row = rows[params.dataIndex] || {};
+              const valueText = `${formatNumber(params.value)}${info.unit}`;
+              if (metric !== "wind") return valueText;
+              const dir = formatWindDirFromTrend(row) || shortWindDir(row.windDir);
+              return dir ? `${valueText}\n${dir}` : valueText;
+            },
+          },
+          emphasis: { focus: "series", scale: true },
+        }],
+      }, true);
+      setTimeout(() => chart.resize(), 0);
+    }
+
+    function disposeChart(containerId) {
+      if (state.charts[containerId]) {
+        state.charts[containerId].dispose();
+        delete state.charts[containerId];
+      }
+    }
+
+    function renderTrendSvg(trend, metric) {
+      const rows = extractTrendRows(trend);
+      if (!rows.length) return `<div class="notice">No valid data in the past 24 hours.</div>`;
+      const w = 720, h = 220, pad = 34;
+      const vals = rows.map((p) => p.value);
+      let min = Math.min(...vals), max = Math.max(...vals);
+      if (min === max) {
+        min -= 1;
+        max += 1;
+      } else {
+        const padding = Math.max((max - min) * 0.12, 0.5);
+        min -= padding;
+        max += padding;
+      }
+      const x = (i) => pad + (i * (w - pad * 2)) / Math.max(1, rows.length - 1);
+      const y = (v) => h - pad - ((v - min) * (h - pad * 2)) / (max - min);
+      const path = rows.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`).join(" ");
+      const area = `${path} L ${x(rows.length - 1).toFixed(1)} ${h - pad} L ${pad} ${h - pad} Z`;
+      const points = rows.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+      const barWidth = Math.max(4, (w - pad * 2) / rows.length * 0.45);
+      const bars = rows.map((p, i) => {
+        const bx = x(i) - barWidth / 2;
+        const by = y(p.value);
+        return `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${(h - pad - by).toFixed(1)}" rx="2" fill="rgba(23,107,135,.12)"/>`;
+      }).join("");
+      const grid = [0.25, 0.5, 0.75].map((ratio) => {
+        const gy = pad + (h - pad * 2) * ratio;
+        return `<line x1="${pad}" y1="${gy}" x2="${w - pad}" y2="${gy}" stroke="#edf1f4"/>`;
+      }).join("");
+      const unit = metricInfo(metric).unit;
+      return `<svg viewBox="0 0 ${w} ${h}" role="img">
+        ${grid}
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" stroke="#dbe4ea"/>
+        <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#dbe4ea"/>
+        ${bars}
+        <path d="${area}" fill="rgba(23,107,135,.14)"/>
+        <polyline points="${points}" fill="none" stroke="#e11d48" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${path}" fill="none" stroke="#0f5f78" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        ${rows.map((p,i) => `<circle cx="${x(i)}" cy="${y(p.value)}" r="5" fill="#fff" stroke="#e11d48" stroke-width="2.5"/>`).join("")}
+        <text x="${pad}" y="22" font-weight="800">${max.toFixed(1)}${unit}</text>
+        <text x="${pad}" y="${h-8}" font-weight="800">${min.toFixed(1)}${unit}</text>
+        <text x="${w-pad-132}" y="${h-8}">${escapeHtml(rows[rows.length - 1]?.time || "")}</text>
+      </svg>`;
+    }
+
+    function renderTrendRows(trend, metric, realtime) {
+      const source = trend?.points || trend?.sk_list || trend?.data || (Array.isArray(trend) ? trend : []);
+      const rows = source.slice(-8).reverse();
+      const unit = metricInfo(metric).unit;
+      return `
+        ${renderTrendWindowSummary(source, metric, realtime)}
+        ${rows.map((p) => {
+          const windDir = metric === "wind" ? formatWindDirFromTrend(p) : "";
+          const valueText = `${windDir} ${String(p.val ?? p.value ?? "-")}`.trim();
+          return `<div class="kv"><div><span>${escapeHtml(p.fulldt || p.dt || p.time || p.sk_time || "-")}</span><strong>${escapeHtml(valueText)}${unit}</strong></div></div>`;
+        }).join("")}
+      `;
+    }
+
+    function renderTrendSummaryOnly(trend, metric, realtime) {
+      const source = trend?.points || trend?.sk_list || trend?.data || (Array.isArray(trend) ? trend : []);
+      return renderTrendWindowSummary(source, metric, realtime);
+    }
+
+    function renderTrendWindowSummary(source, metric, realtime) {
+      const unit = metricInfo(metric).unit;
+      const current = currentMetricFromRealtime(realtime, metric);
+      const currentWindDir = metric === "wind" ? windDirectionText(realtime) : "";
+      const windows = [
+        { label: "实时", html: current === null ? "-" : `${escapeHtml(currentWindDir)} ${formatNumber(current)}${unit}`.trim() },
+        { label: "过去3小时", html: minMaxText(source, 3, unit) },
+        { label: "过去12小时", html: minMaxText(source, 12, unit) },
+        { label: "过去24小时", html: minMaxText(source, 24, unit) },
+      ];
+      return `<div class="trend-summary-grid">${windows.map((item) => `
+        <div class="trend-window"><span>${item.label}</span><strong>${item.html}</strong></div>
+      `).join("")}</div>`;
+    }
+
+    function minMaxText(source, hours, unit) {
+      const values = source.slice(-hours).map((p) => parseMetricNumber(p.val ?? p.value)).filter(Number.isFinite);
+      if (!values.length) return "-";
+      return `高 ${formatNumber(Math.max(...values))}${unit}<br>低 ${formatNumber(Math.min(...values))}${unit}`;
+    }
+
+    function currentMetricFromRealtime(realtime, metric) {
+      const raw = realtime?.raw || realtime || {};
+      const value = {
+        temperature: raw.ct,
+        humidity: raw.humidity,
+        pressure: raw.vaporpressuser || raw.airpressure,
+        wind: raw.wind_speed || raw.windspeed_twominuteave || raw.wind,
+        rainfall: raw.rainfall,
+      }[metric];
+      const parsed = parseMetricNumber(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function windDirectionText(realtime) {
+      const raw = realtime?.raw || realtime || {};
+      return raw.wind_dir || raw.winddir_twominuteave || raw.winddir_current_org || raw.winddir_current || "";
+    }
+
+    function shortWindDir(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      return text.replace(/风力|风向|持续/g, "").replace(/\s+/g, "").slice(0, 4);
+    }
+
+    function formatWindDirFromTrend(point) {
+      const value = parseMetricNumber(point.wind_dir ?? point.windDir);
+      if (!Number.isFinite(value)) return "";
+      const dirs = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"];
+      return dirs[Math.round((((value % 360) + 360) % 360) / 45) % 8];
+    }
+
+    function formatNumber(value) {
+      return Number(value).toFixed(Math.abs(value) >= 100 ? 0 : 1).replace(/\.0$/, "");
+    }
+
+    function renderGisLegend() {
+      const info = metricInfo($("gisMetric").value);
+      const gradient = `linear-gradient(90deg, ${info.stops.map((stop) => stop.color).join(", ")})`;
+      $("gisLegend").innerHTML = `
+        <div class="legend-scale">
+          <div class="legend-labels">${info.stops.map((stop) => `<span>${escapeHtml(stop.label)}</span>`).join("")}</div>
+          <div class="legend-gradient" style="background:${gradient}"></div>
+          <div class="legend-ticks">${info.stops.map((stop) => `<span>${escapeHtml(stop.tick)}</span>`).join("")}</div>
+        </div>
+        <div class="legend-note">${escapeHtml(info.description)}；缩放到 11 级及以上时，点位下方显示当前 ${escapeHtml(info.label)} 数值。</div>`;
+    }
+
+    function setBaseMap(kind) {
+      if (!state.gis.map) return;
+      state.gis.baseMap = kind;
+      if (state.gis.tileLayer) state.gis.map.removeLayer(state.gis.tileLayer);
+      const options = { maxZoom: 18, attribution: "" };
+      const urls = {
+        amap: "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+        esri: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        carto: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        osm: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      };
+      state.gis.tileLayer = L.tileLayer(urls[kind] || urls.amap, options).addTo(state.gis.map);
+      $("coordNote").textContent = kind === "amap"
+        ? "高德底图使用 GCJ-02，自动站原始经纬度已转换后叠加。"
+        : "当前底图使用标准经纬度，自动站按原始坐标叠加。";
+    }
+
+    async function searchStations() {
+      const q = $("stationSearch").value.trim();
+      if (!q) { $("searchResults").hidden = true; return; }
+      try {
+        const data = await fetchJson(`/api/search-stations?q=${encodeURIComponent(q)}&limit=20`);
+        const seen = new Set();
+        const rows = [...(data.obs_stations || []), ...(data.auto_stations || []), ...(data.weather_areas || [])]
+          .filter((row) => {
+            const key = `${row.station_id || ""}-${row.area_id || row.area || ""}-${row.name || row.station_name || row.area_name || ""}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, 20);
+        $("searchResults").innerHTML = rows.map((r) => `<button class="result-item" data-station="${escapeAttr(r.station_id || "")}" data-area="${escapeAttr(r.area_id || r.area || "")}"><strong>${escapeHtml(r.station_name || r.name || r.area_name || "-")}</strong><span>${escapeHtml(r.city || r.area_name || "")} ${escapeHtml(r.station_id || r.area_id || "")}</span></button>`).join("") || `<div class="notice">没有匹配结果。</div>`;
+        $("searchResults").hidden = false;
+        $("searchResults").querySelectorAll("button[data-station],button[data-area]").forEach((button) => button.addEventListener("click", async () => {
+          if (button.dataset.area) $("weatherArea").value = button.dataset.area;
+          if (button.dataset.station) {
+            state.gis.selectedStationId = button.dataset.station;
+          }
+          $("searchResults").hidden = true;
+          $("stationSearch").value = button.querySelector("strong")?.textContent || "";
+          refreshLatest();
+        }));
+      } catch (error) { showError(error); }
+    }
+
+    function locateNearest() {
+      navigator.geolocation?.getCurrentPosition(async (pos) => {
+        try {
+          const data = await fetchJson(`/api/nearest-stations?lon=${pos.coords.longitude}&lat=${pos.coords.latitude}&limit=1`);
+          const row = data.results?.[0];
+          if (row?.area_id) $("weatherArea").value = row.area_id;
+          if (row?.station_id) state.gis.selectedStationId = row.station_id;
+          $("stationSearch").value = row?.station_name || row?.name || "";
+          refreshLatest();
+        } catch (error) { showError(error); }
+      }, () => setMessage("无法获取浏览器定位权限", false));
+    }
+
+    function setupAutoRefresh() {
+      clearInterval(state.refreshTimer);
+      const seconds = Number($("autoRefresh").value);
+      if (seconds) state.refreshTimer = setInterval(() => state.mode === "gis" ? loadGis() : refreshLatest(), seconds * 1000);
+    }
+    function togglePlayback() {
+      if (state.playTimer) return stopPlayback();
+      $("play").textContent = "Ⅱ";
+      state.playTimer = setInterval(() => {
+        const frames = getFrames();
+        if (!frames.length) return;
+        state.activeFrameIndex = (state.activeFrameIndex + 1) % frames.length;
+        renderRadar();
+      }, 650);
+    }
+    function stopPlayback() { clearInterval(state.playTimer); state.playTimer = null; $("play").textContent = "▶"; }
+    function ensureActiveGroup() {
+      if (!state.groups.length) return;
+      if (!state.activeGroupId || !state.groups.some((g) => String(g.id) === String(state.activeGroupId))) state.activeGroupId = state.groups[0].id;
+      if (!findStation(state.activeStationId)) {
+        const first = groupStations(activeGroup())[0]?.station_id;
+        if (first) state.activeStationId = first;
+      }
+    }
+    function activeGroup() { return state.groups.find((g) => String(g.id) === String(state.activeGroupId)) || state.groups[0]; }
+    function groupStations(group) {
+      return (group?.stationList || group?.list || []).map((item) => item.station || item).filter(Boolean);
+    }
+    function findStation(id) { return state.groups.flatMap(groupStations).find((station) => String(station.station_id) === String(id)); }
+    function selectedFeature() { return state.gis.features.find((f) => f.station_id === state.gis.selectedStationId) || state.gis.features[0]; }
+    function displayLonLat(lon, lat) {
+      if (state.gis.baseMap === "amap") return wgs84ToGcj02(lon, lat);
+      return { lon, lat };
+    }
+    function wgs84ToGcj02(lon, lat) {
+      if (outOfChina(lon, lat)) return { lon, lat };
+      const a = 6378245.0;
+      const ee = 0.00669342162296594323;
+      let dLat = transformLat(lon - 105.0, lat - 35.0);
+      let dLon = transformLon(lon - 105.0, lat - 35.0);
+      const radLat = lat / 180.0 * Math.PI;
+      let magic = Math.sin(radLat);
+      magic = 1 - ee * magic * magic;
+      const sqrtMagic = Math.sqrt(magic);
+      dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+      dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+      return { lon: lon + dLon, lat: lat + dLat };
+    }
+    function outOfChina(lon, lat) {
+      return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271;
+    }
+    function transformLat(x, y) {
+      let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+      ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+      ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+      ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+      return ret;
+    }
+    function transformLon(x, y) {
+      let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+      ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+      ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+      ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+      return ret;
+    }
+    function selectedGisScope() {
+      const checkedValues = Array.from($("gisRegionChecks").querySelectorAll("input:checked")).map((input) => input.value);
+      const checkedScopes = state.gis.cities.filter((scope) => checkedValues.includes(scope.value));
+      if (checkedScopes.length) {
+        const citySet = new Set();
+        let count = 0;
+        for (const scope of checkedScopes) {
+          count += Number(scope.count || 0);
+          for (const city of scope.cities || []) citySet.add(city);
+        }
+        return {
+          value: checkedScopes.map((scope) => scope.value).join("+"),
+          label: checkedScopes.map((scope) => scope.label).join(" + "),
+          cities: Array.from(citySet),
+          count,
+        };
+      }
+      const fallback = state.gis.cities[state.gis.cityIndex] || state.gis.cities[0];
+      if (fallback) {
+        const input = Array.from($("gisRegionChecks").querySelectorAll("input")).find((item) => item.value === fallback.value);
+        if (input) input.checked = true;
+        return fallback;
+      }
+      return state.gis.cities[state.gis.cityIndex] || state.gis.cities.find((item) => item.value === $("gisCity").value);
+    }
+    async function fetchJson(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+      return data;
+    }
+    function currentOf(f) { return f?.current || f || {}; }
+    function metricValue(f, metric) {
+      const current = currentOf(f);
+      return parseMetricNumber(metric === "wind" ? current?.wind : current?.[metric]);
+    }
+    function parseMetricNumber(value) {
+      if (value === undefined || value === null) return NaN;
+      const text = String(value).trim();
+      if (!text || text === "--" || text === "-" || text.toLowerCase() === "null") return NaN;
+      const parsed = Number(text);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    }
+    function formatMetricValue(f, metric) {
+      const value = metricValue(f, metric);
+      if (!Number.isFinite(value)) return "-";
+      return `${value.toFixed(metric === "rainfall" ? 1 : 0)}${metricInfo(metric).unit}`;
+    }
+    function metricInfo(metric) {
+      return ({
+        temperature: {
+          label: "气温",
+          unit: "°C",
+          description: "低温 <20°C，舒适 20-30°C，偏热 30-35°C，高温 ≥35°C",
+          stops: [
+            { value: 15, tick: "<20°C", label: "低温", color: "#2563eb" },
+            { value: 25, tick: "20-30°C", label: "舒适", color: "#16a34a" },
+            { value: 32, tick: "30-35°C", label: "偏热", color: "#d5a21a" },
+            { value: 38, tick: "≥35°C", label: "高温", color: "#c2410c" },
+          ],
+        },
+        rainfall: {
+          label: "降雨量",
+          unit: "mm",
+          description: "无雨 0mm，小雨 0.1-2mm，中雨 2-8mm，强降雨 ≥8mm",
+          stops: [
+            { value: 0, tick: "0", label: "无雨", color: "#e5e7eb" },
+            { value: 0.1, tick: "0.1-2", label: "小雨", color: "#bae6fd" },
+            { value: 2, tick: "2-8", label: "中雨", color: "#0284c7" },
+            { value: 8, tick: "≥8mm", label: "强降雨", color: "#1e3a8a" },
+          ],
+        },
+        humidity: {
+          label: "湿度",
+          unit: "%",
+          description: "偏干 <40%，舒适 40-70%，潮湿 70-90%，高湿 ≥90%",
+          stops: [
+            { value: 30, tick: "<40%", label: "偏干", color: "#f59e0b" },
+            { value: 55, tick: "40-70%", label: "舒适", color: "#14b8a6" },
+            { value: 80, tick: "70-90%", label: "潮湿", color: "#0369a1" },
+            { value: 95, tick: "≥90%", label: "高湿", color: "#1e3a8a" },
+          ],
+        },
+        pressure: {
+          label: "气压",
+          unit: "hPa",
+          description: "低压 <1000hPa，常规 1000-1015hPa，高压 ≥1015hPa",
+          stops: [
+            { value: 990, tick: "<1000", label: "低压", color: "#7c3aed" },
+            { value: 1007, tick: "1000-1015", label: "常规", color: "#0f766e" },
+            { value: 1020, tick: "≥1015hPa", label: "高压", color: "#b45309" },
+          ],
+        },
+        wind: {
+          label: "风速",
+          unit: "m/s",
+          description: "微风 <3m/s，有风 3-8m/s，较强 8-13m/s，大风 ≥13m/s",
+          stops: [
+            { value: 1, tick: "<3", label: "微风", color: "#a7f3d0" },
+            { value: 5, tick: "3-8", label: "有风", color: "#0f766e" },
+            { value: 10, tick: "8-13", label: "较强", color: "#d97706" },
+            { value: 15, tick: "≥13m/s", label: "大风", color: "#be123c" },
+          ],
+        },
+      })[metric] || {};
+    }
+    function metricColor(metric, value) {
+      if (!Number.isFinite(Number(value))) return "#94a3b8";
+      const v = Number(value);
+      const stops = metricInfo(metric).stops || [];
+      if (!stops.length) return "#94a3b8";
+      if (v <= stops[0].value) return stops[0].color;
+      for (let i = 1; i < stops.length; i++) {
+        if (v <= stops[i].value) {
+          const prev = stops[i - 1];
+          const ratio = (v - prev.value) / Math.max(0.001, stops[i].value - prev.value);
+          return mixColor(prev.color, stops[i].color, ratio);
+        }
+      }
+      return stops[stops.length - 1].color;
+    }
+    function mixColor(a, b, ratio) {
+      const ar = hexToRgb(a), br = hexToRgb(b);
+      const channel = (x, y) => Math.round(x + (y - x) * Math.max(0, Math.min(1, ratio)));
+      return `rgb(${channel(ar.r, br.r)}, ${channel(ar.g, br.g)}, ${channel(ar.b, br.b)})`;
+    }
+    function hexToRgb(hex) {
+      const value = hex.replace("#", "");
+      return {
+        r: parseInt(value.slice(0, 2), 16),
+        g: parseInt(value.slice(2, 4), 16),
+        b: parseInt(value.slice(4, 6), 16),
+      };
+    }
+    function windDirectionDeg(text = "") {
+      if (text.includes("东北")) return 45;
+      if (text.includes("东南")) return 135;
+      if (text.includes("西南")) return 225;
+      if (text.includes("西北")) return 315;
+      if (text.includes("北")) return 0;
+      if (text.includes("东")) return 90;
+      if (text.includes("南")) return 180;
+      if (text.includes("西")) return 270;
+      return 0;
+    }
+    function val(value, unit) { return value === undefined || value === null || value === "" ? "-" : `${value}${unit}`; }
+    function formatRadarTick(text) { return String(text || "").replace(/^\d{4}-?/, "").replace("T", " ").slice(-11) || "-"; }
+    function shortDate(text) {
+      const parts = String(text || "").split(" ");
+      return parts[parts.length - 1];
+    }
+    function setMessage(text, good) { $("message").textContent = text; $("message").classList.toggle("good", !!good); }
+    function showError(error) { console.error(error); setMessage(`失败：${error.message}`, false); }
+    function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m])); }
+    function escapeAttr(value) { return escapeHtml(value); }
+    function debounce(fn, wait) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); }; }
+  </script>
+</body>
+</html>
