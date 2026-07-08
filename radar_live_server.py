@@ -861,6 +861,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
             elif parsed.path == "/api/latest":
                 self.send_json(api_latest(query))
+            elif parsed.path == "/radar-latest.jpg":
+                self.send_latest_radar_image(query)
             elif parsed.path == "/api/search-stations":
                 keyword = query.get("q", [""])[0]
                 limit = int(query.get("limit", ["20"])[0])
@@ -945,6 +947,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def send_latest_radar_image(self, query: Dict[str, List[str]]) -> None:
+        station_id = query.get("station_id", ["20002"])[0]
+        count = query.get("count", ["6"])[0]
+        frames = fetch_sequence(station_id, count)
+        if not frames:
+            self.send_error(404, "No radar image available")
+            return
+        latest = frames[-1]
+        url = latest.get("url", "")
+        if not url.startswith("http://www.fjqxfw.cn:8099/ftp/"):
+            self.send_error(502, "Invalid upstream image URL")
+            return
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            data = response.read()
+            content_type = response.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/jpeg"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Radar-Station", str(station_id))
+        self.send_header("X-Radar-Time", str(latest.get("time", "")))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
