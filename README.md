@@ -8,6 +8,7 @@
 - 天气地图：Leaflet GIS 地图，按自动气象站点位显示气温、降雨量、湿度、气压、风速风向。
 - 气象云图：雷达拼图、单站雷达、相控阵雷达、综合云图。
 - 支持站点搜索、GPS 最近站推荐、底图切换、城市多选加载。
+- Home Assistant 可通过固定图片地址接入厦门相控阵雷达最新图。
 
 ## 本地启动
 
@@ -26,6 +27,43 @@ http://127.0.0.1:8765/
 
 ```text
 http://127.0.0.1:8765/healthz
+```
+
+## Home Assistant 显示厦门相控阵雷达
+
+服务提供固定图片地址：
+
+```text
+http://<fjqx服务器IP>:8765/radar-latest.jpg?station_id=20002&count=6
+```
+
+其中 `20002` 是厦门相控阵雷达。
+
+在 Home Assistant 的 `configuration.yaml` 添加：
+
+```yaml
+camera:
+  - platform: generic
+    name: 厦门相控阵雷达
+    still_image_url: "http://<fjqx服务器IP>:8765/radar-latest.jpg?station_id=20002&count=6"
+    content_type: image/jpeg
+    verify_ssl: false
+```
+
+重启 Home Assistant 后，可以在 Lovelace 添加 Picture Entity 卡片：
+
+```yaml
+type: picture-entity
+entity: camera.xia_men_xiang_kong_zhen_lei_da
+name: 厦门相控阵雷达
+show_state: false
+show_name: true
+```
+
+如果 Home Assistant 与 fjqx 在同一台机器上，地址可写：
+
+```text
+http://127.0.0.1:8765/radar-latest.jpg?station_id=20002&count=6
 ```
 
 ## Linux 服务器部署
