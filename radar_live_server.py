@@ -62,6 +62,7 @@ CWA_TIMEOUT_SECONDS = max(3, env_int("CWA_TIMEOUT_SECONDS", 12))
 CWA_STATION_TIMEOUT_SECONDS = max(15, env_int("CWA_STATION_TIMEOUT_SECONDS", 90))
 CWA_RETRIES = max(1, min(env_int("CWA_RETRIES", 2), 4))
 CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 30), 80))
+CWA_STATION_WORKERS = max(1, min(env_int("CWA_STATION_WORKERS", 4), 8))
 CWA_USE_BASIC_INDEX = os.environ.get("CWA_USE_BASIC_INDEX", "0") in {"1", "true", "yes"}
 
 
@@ -94,7 +95,7 @@ def load_runtime_cache() -> None:
         data = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return
-    for key in ["current_weather", "station_history", "weather_history"]:
+    for key in ["current_weather", "station_history", "weather_history", "taiwan_station_current"]:
         if isinstance(data.get(key), dict):
             CACHE[key] = data[key]
 
@@ -104,6 +105,7 @@ def save_runtime_cache() -> None:
         "current_weather": CACHE.get("current_weather", {}),
         "station_history": CACHE.get("station_history", {}),
         "weather_history": CACHE.get("weather_history", {}),
+        "taiwan_station_current": CACHE.get("taiwan_station_current", {}),
         "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     CACHE_FILE.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -795,11 +797,45 @@ def fetch_cached_cwa_observations(target_counties: List[str] | None = None) -> L
         if not wanted or cwa_rows_cover_counties(rows, wanted):
             return rows
     if wanted:
+        station_cache_key = ",".join(sorted(wanted))
+        station_cached = CACHE.setdefault("taiwan_station_current", {}).get(station_cache_key)
+        if isinstance(station_cached, dict) and cache_fresh(station_cached, CWA_TTL_SECONDS):
+            return station_cached.get("data", [])
         station_index = load_cwa_station_index(wanted)
         station_rows = [row for row in station_index if normalize_taiwan_name(row.get("city", "")) in wanted]
         if station_rows:
             rows, errors = fetch_cwa_station_observations(station_rows)
+            if not rows and station_rows:
+                rows = [
+                    {
+                        **row,
+                        "updated": "",
+                        "temperature": "",
+                        "humidity": "",
+                        "rainfall": "",
+                        "pressure": "",
+                        "wind": "",
+                        "wind_dir": "",
+                        "current": {
+                            **row,
+                            "updated": "",
+                            "temperature": "",
+                            "humidity": "",
+                            "rainfall": "",
+                            "pressure": "",
+                            "wind": "",
+                            "wind_dir": "",
+                        },
+                        "stats24h": {},
+                    }
+                    for row in station_rows
+                ]
             if rows:
+                CACHE.setdefault("taiwan_station_current", {})[station_cache_key] = {
+                    "fetched_at_epoch": datetime.now().timestamp(),
+                    "data": rows,
+                    "errors": errors,
+                }
                 cache["O-A0001-001"] = {
                     "fetched_at_epoch": datetime.now().timestamp(),
                     "data": rows,
@@ -948,13 +984,37 @@ def fetch_cwa_station_observations(station_rows: List[Dict[str, Any]]) -> tuple[
     rows = []
     errors = []
     ids = [str(row.get("station_id", "")).replace("TW:", "") for row in station_rows if row.get("station_id")]
-    for chunk in chunked(ids, CWA_STATION_CHUNK):
+    chunks = chunked(ids, CWA_STATION_CHUNK)
+    executor = ThreadPoolExecutor(max_workers=CWA_STATION_WORKERS)
+    futures = {
+        executor.submit(fetch_cwa_station_chunk, chunk): chunk
+        for chunk in chunks
+    }
+    completed = set()
+    try:
+        total_timeout = min(35, (CWA_TIMEOUT_SECONDS * CWA_RETRIES + 2) * max(1, math.ceil(len(chunks) / CWA_STATION_WORKERS)))
         try:
-            data = fetch_cwa_json(CWA_OBS_URL, {"StationId": ",".join(chunk), "limit": len(chunk)})
-            rows.extend(normalize_cwa_observations(data))
-        except Exception as exc:
-            errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": str(exc)})
+            for future in as_completed(futures, timeout=total_timeout):
+                completed.add(future)
+                chunk = futures[future]
+                try:
+                    rows.extend(future.result())
+                except Exception as exc:
+                    errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": str(exc)})
+        except FuturesTimeoutError:
+            pass
+        for future, chunk in futures.items():
+            if future not in completed:
+                future.cancel()
+                errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": "station request timed out"})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
     return rows, errors
+
+
+def fetch_cwa_station_chunk(chunk: List[str]) -> List[Dict[str, Any]]:
+    data = fetch_cwa_json(CWA_OBS_URL, {"StationId": ",".join(chunk), "limit": len(chunk)}, timeout=CWA_TIMEOUT_SECONDS)
+    return normalize_cwa_observations(data)
 
 
 def chunked(items: List[str], size: int) -> List[List[str]]:
