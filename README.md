@@ -163,8 +163,8 @@ Environment=CWA_PAGE_LIMIT=80
 Environment=CWA_MAX_PAGES=8
 Environment=CWA_TARGET_MAX_PAGES=30
 Environment=CWA_WORKERS=6
-Environment=CWA_STATION_CHUNK=80
-Environment=CWA_STATION_WORKERS=4
+Environment=CWA_STATION_CHUNK=5
+Environment=CWA_STATION_WORKERS=8
 Environment=CWA_TIMEOUT_SECONDS=12
 Environment=CWA_RETRIES=2
 ```
