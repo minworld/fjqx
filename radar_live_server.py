@@ -24,11 +24,13 @@ WEATHER_AREA_URL = FTP_BASE + "ztq_fj/ztq_area/and/lv3.json"
 OBS_STATION_URL = FTP_BASE + "ztq/ztq_area/and/2Fj_stations20260626102716.json"
 CWA_API_KEY = os.environ.get("CWA_API_KEY") or os.environ.get("CWB_API_KEY") or ""
 CWA_OBS_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
+CWA_STATION_BASIC_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/C-B0074-002"
 TOKEN = "10002-45aad81b00cdfd743b1c6cdb8aaf2b9aef18ec05"
 USER_ID = "202309275065959"
 USER_AGENT = "zhi tian qi-jue ce/4.0.13 (iPhone; iOS 26.5; Scale/3.00)"
 CWA_USER_AGENT = "Mozilla/5.0 (compatible; fjqx/1.0; +https://github.com/minworld/fjqx)"
 CACHE_FILE = ROOT / "weather_runtime_cache.json"
+CWA_STATION_FILE = ROOT / "cwa_station_index.json"
 CURRENT_TTL_SECONDS = 600
 HISTORY_TTL_SECONDS = 900
 STATION_TTL_SECONDS = 600
@@ -51,12 +53,16 @@ def env_int(name: str, default: int) -> int:
         return default
 
 
-CWA_LIMIT = max(1, env_int("CWA_LIMIT", 1200))
+CWA_LIMIT = max(1, env_int("CWA_LIMIT", 2400))
 CWA_PAGE_LIMIT = max(1, env_int("CWA_PAGE_LIMIT", 80))
 CWA_MAX_PAGES = max(1, env_int("CWA_MAX_PAGES", 8))
-CWA_WORKERS = max(1, min(env_int("CWA_WORKERS", 6), 12))
+CWA_TARGET_MAX_PAGES = max(CWA_MAX_PAGES, env_int("CWA_TARGET_MAX_PAGES", 30))
+CWA_WORKERS = max(1, min(env_int("CWA_WORKERS", 4), 12))
 CWA_TIMEOUT_SECONDS = max(3, env_int("CWA_TIMEOUT_SECONDS", 12))
+CWA_STATION_TIMEOUT_SECONDS = max(15, env_int("CWA_STATION_TIMEOUT_SECONDS", 90))
 CWA_RETRIES = max(1, min(env_int("CWA_RETRIES", 2), 4))
+CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 30), 80))
+CWA_USE_BASIC_INDEX = os.environ.get("CWA_USE_BASIC_INDEX", "0") in {"1", "true", "yes"}
 
 
 def request_json(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,7 +122,7 @@ def fetch_url_json(url: str) -> Dict[str, Any]:
     return repair_text(json.loads(text))
 
 
-def fetch_cwa_json(resource_url: str, params: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def fetch_cwa_json(resource_url: str, params: Dict[str, Any] | None = None, timeout: int | None = None) -> Dict[str, Any]:
     if not CWA_API_KEY:
         raise RuntimeError("CWA_API_KEY is not configured")
     query = {"Authorization": CWA_API_KEY, "format": "JSON"}
@@ -127,14 +133,14 @@ def fetch_cwa_json(resource_url: str, params: Dict[str, Any] | None = None) -> D
     last_error: Exception | None = None
     for _ in range(CWA_RETRIES):
         try:
-            with urllib.request.urlopen(request, timeout=CWA_TIMEOUT_SECONDS) as response:
+            with urllib.request.urlopen(request, timeout=timeout or CWA_TIMEOUT_SECONDS) as response:
                 raw = response.read()
-            return json.loads(raw.decode("utf-8", errors="replace"))
+            return repair_text(json.loads(raw.decode("utf-8", errors="replace")))
         except http.client.IncompleteRead as exc:
             last_error = exc
             raw = exc.partial or b""
             try:
-                return json.loads(raw.decode("utf-8", errors="replace"))
+                return repair_text(json.loads(raw.decode("utf-8", errors="replace")))
             except json.JSONDecodeError:
                 continue
     if last_error:
@@ -433,7 +439,7 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
 
     if include_taiwan:
         try:
-            taiwan_rows = fetch_cached_cwa_observations()
+            taiwan_rows = fetch_cached_cwa_observations(taiwan_counties)
             errors.extend(CACHE.get("taiwan_cwa", {}).get("O-A0001-001", {}).get("errors", [])[:10])
             if taiwan_counties:
                 wanted = {normalize_taiwan_name(name) for name in taiwan_counties}
@@ -780,15 +786,186 @@ def normalize_station_weather(data: Dict[str, Any], station: Dict[str, Any]) -> 
     return result
 
 
-def fetch_cached_cwa_observations() -> List[Dict[str, Any]]:
+def fetch_cached_cwa_observations(target_counties: List[str] | None = None) -> List[Dict[str, Any]]:
+    wanted = {normalize_taiwan_name(name) for name in (target_counties or []) if name}
     cache = CACHE.setdefault("taiwan_cwa", {})
     cached = cache.get("O-A0001-001")
     if isinstance(cached, dict) and cache_fresh(cached, CWA_TTL_SECONDS):
-        return cached.get("data", [])
+        rows = cached.get("data", [])
+        if not wanted or cwa_rows_cover_counties(rows, wanted):
+            return rows
+    if wanted:
+        station_index = load_cwa_station_index(wanted)
+        station_rows = [row for row in station_index if normalize_taiwan_name(row.get("city", "")) in wanted]
+        if station_rows:
+            rows, errors = fetch_cwa_station_observations(station_rows)
+            if rows:
+                cache["O-A0001-001"] = {
+                    "fetched_at_epoch": datetime.now().timestamp(),
+                    "data": rows,
+                    "errors": errors,
+                    "mode": "station_id",
+                }
+                return rows
+    max_pages = CWA_TARGET_MAX_PAGES if wanted else CWA_MAX_PAGES
+    rows, errors = fetch_cwa_pages(max_pages, wanted)
+    if wanted and rows and not cwa_rows_cover_counties(rows, wanted):
+        extra_pages = max(CWA_TARGET_MAX_PAGES, math.ceil(CWA_LIMIT / CWA_PAGE_LIMIT))
+        if extra_pages > max_pages:
+            rows, errors = fetch_cwa_pages(extra_pages, wanted)
+    if rows:
+        write_cwa_station_index(merge_station_index(read_cwa_station_index(), rows), errors)
+    cache["O-A0001-001"] = {
+        "fetched_at_epoch": datetime.now().timestamp(),
+        "data": rows,
+        "errors": errors,
+    }
+    if errors and not rows:
+        raise RuntimeError("CWA page requests failed: " + "; ".join(f"page {item['page']} {item['error']}" for item in errors[:3]))
+    return rows
+
+
+def cwa_rows_cover_counties(rows: List[Dict[str, Any]], wanted: set[str]) -> bool:
+    found = {normalize_taiwan_name(row.get("city", "")) for row in rows}
+    return wanted.issubset(found)
+
+
+def load_cwa_station_index(target_counties: set[str] | None = None) -> List[Dict[str, Any]]:
+    target_counties = target_counties or set()
+    rows = read_cwa_station_index()
+    if rows and (not target_counties or cwa_rows_cover_counties(rows, target_counties)):
+        return rows
+    if CWA_USE_BASIC_INDEX:
+        try:
+            basic_rows = fetch_cwa_station_basic_index()
+            rows = merge_station_index(rows, basic_rows)
+            if rows:
+                write_cwa_station_index(rows, [])
+            if rows and (not target_counties or cwa_rows_cover_counties(rows, target_counties)):
+                return rows
+        except Exception:
+            pass
+    max_pages = CWA_TARGET_MAX_PAGES if target_counties else CWA_MAX_PAGES
+    observed, errors = fetch_cwa_pages(max_pages, target_counties, stop_when_found=False)
+    rows = merge_station_index(rows, observed)
+    if rows:
+        write_cwa_station_index(rows, errors)
+    return rows
+
+
+def fetch_cwa_station_basic_index() -> List[Dict[str, Any]]:
+    data = fetch_cwa_json(CWA_STATION_BASIC_URL, timeout=CWA_STATION_TIMEOUT_SECONDS)
+    rows = []
+    for item in find_station_basic_rows(data):
+        row = normalize_cwa_station_basic(item)
+        if row:
+            rows.append(row)
+    return rows
+
+
+def find_station_basic_rows(value: Any) -> List[Dict[str, Any]]:
+    if isinstance(value, list):
+        if value and isinstance(value[0], dict) and any(key in value[0] for key in ["StationID", "StationId"]):
+            return value
+        rows = []
+        for item in value:
+            rows.extend(find_station_basic_rows(item))
+        return rows
+    if isinstance(value, dict):
+        rows = []
+        for item in value.values():
+            rows.extend(find_station_basic_rows(item))
+        return rows
+    return []
+
+
+def normalize_cwa_station_basic(row: Dict[str, Any]) -> Dict[str, Any] | None:
+    station_id = str(first_value(row, ["StationID", "StationId", "stationId"]) or "").strip()
+    lon = parse_float(first_value(row, ["StationLongitude", "longitude", "lon"]))
+    lat = parse_float(first_value(row, ["StationLatitude", "latitude", "lat"]))
+    if not station_id or lon is None or lat is None:
+        return None
+    end_date = str(first_value(row, ["StationEndDate", "stationEndDate"]) or "").strip()
+    status = str(first_value(row, ["status", "Status"]) or "").strip()
+    if end_date and end_date not in {"None", "null", "-"}:
+        return None
+    return {
+        "source": "taiwan_cwa",
+        "kind": "taiwan_auto_station",
+        "area_id": "taiwan",
+        "station_id": f"TW:{station_id}",
+        "name": first_value(row, ["StationName", "stationName"]) or station_id,
+        "city": first_value(row, ["CountyName", "countyName"]) or "台湾",
+        "area_name": first_value(row, ["Location", "TownName", "townName"]) or "",
+        "lon": lon,
+        "lat": lat,
+        "status": status,
+    }
+
+
+def read_cwa_station_index() -> List[Dict[str, Any]]:
+    if not CWA_STATION_FILE.exists():
+        return []
+    try:
+        data = json.loads(CWA_STATION_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    rows = data.get("stations", [])
+    return rows if isinstance(rows, list) else []
+
+
+def write_cwa_station_index(rows: List[Dict[str, Any]], errors: List[Dict[str, Any]] | None = None) -> None:
+    payload = {
+        "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "count": len(rows),
+        "stations": rows,
+        "errors": errors or [],
+    }
+    CWA_STATION_FILE.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def merge_station_index(existing: List[Dict[str, Any]], observed: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged = {}
+    for row in existing + observed:
+        station_id = row.get("station_id")
+        if not station_id:
+            continue
+        merged[station_id] = {
+            "source": "taiwan_cwa",
+            "kind": "taiwan_auto_station",
+            "area_id": "taiwan",
+            "station_id": station_id,
+            "name": row.get("name", ""),
+            "city": row.get("city", ""),
+            "area_name": row.get("area_name", ""),
+            "lon": row.get("lon", ""),
+            "lat": row.get("lat", ""),
+        }
+    return sorted(merged.values(), key=lambda item: (item.get("city", ""), item.get("name", "")))
+
+
+def fetch_cwa_station_observations(station_rows: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    rows = []
+    errors = []
+    ids = [str(row.get("station_id", "")).replace("TW:", "") for row in station_rows if row.get("station_id")]
+    for chunk in chunked(ids, CWA_STATION_CHUNK):
+        try:
+            data = fetch_cwa_json(CWA_OBS_URL, {"StationId": ",".join(chunk), "limit": len(chunk)})
+            rows.extend(normalize_cwa_observations(data))
+        except Exception as exc:
+            errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": str(exc)})
+    return rows, errors
+
+
+def chunked(items: List[str], size: int) -> List[List[str]]:
+    return [items[index:index + size] for index in range(0, len(items), size)]
+
+
+def fetch_cwa_pages(max_pages: int, wanted: set[str] | None = None, stop_when_found: bool = True) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     rows = []
     errors = []
     executor = ThreadPoolExecutor(max_workers=CWA_WORKERS)
-    pages = min(CWA_MAX_PAGES, max(1, math.ceil(CWA_LIMIT / CWA_PAGE_LIMIT)))
+    pages = min(max_pages, max(1, math.ceil(CWA_LIMIT / CWA_PAGE_LIMIT)))
     futures = {
         executor.submit(fetch_cwa_json, CWA_OBS_URL, {"limit": CWA_PAGE_LIMIT, "offset": page * CWA_PAGE_LIMIT}): page
         for page in range(pages)
@@ -796,11 +973,16 @@ def fetch_cached_cwa_observations() -> List[Dict[str, Any]]:
     try:
         completed = set()
         try:
-            for future in as_completed(futures, timeout=CWA_TIMEOUT_SECONDS * CWA_RETRIES + 2):
+            total_timeout = (CWA_TIMEOUT_SECONDS * CWA_RETRIES + 2) * max(1, math.ceil(pages / CWA_WORKERS))
+            if wanted:
+                total_timeout = min(total_timeout, 45)
+            for future in as_completed(futures, timeout=total_timeout):
                 completed.add(future)
                 page = futures[future]
                 try:
                     rows.extend(normalize_cwa_observations(future.result()))
+                    if wanted and stop_when_found and cwa_rows_cover_counties(rows, wanted):
+                        break
                 except Exception as exc:
                     errors.append({"source": "taiwan_cwa", "page": page, "error": str(exc)})
         except FuturesTimeoutError:
@@ -815,14 +997,7 @@ def fetch_cached_cwa_observations() -> List[Dict[str, Any]]:
     for row in rows:
         deduped[row["station_id"]] = row
     rows = list(deduped.values())
-    cache["O-A0001-001"] = {
-        "fetched_at_epoch": datetime.now().timestamp(),
-        "data": rows,
-        "errors": errors,
-    }
-    if errors and not rows:
-        raise RuntimeError("CWA page requests failed: " + "; ".join(f"page {item['page']} {item['error']}" for item in errors[:3]))
-    return rows
+    return rows, errors
 
 
 def normalize_cwa_observations(data: Dict[str, Any]) -> List[Dict[str, Any]]:
