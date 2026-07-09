@@ -4,10 +4,12 @@ import math
 import mimetypes
 import os
 import re
+import http.client
 import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -25,6 +27,7 @@ CWA_OBS_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
 TOKEN = "10002-45aad81b00cdfd743b1c6cdb8aaf2b9aef18ec05"
 USER_ID = "202309275065959"
 USER_AGENT = "zhi tian qi-jue ce/4.0.13 (iPhone; iOS 26.5; Scale/3.00)"
+CWA_USER_AGENT = "Mozilla/5.0 (compatible; fjqx/1.0; +https://github.com/minworld/fjqx)"
 CACHE_FILE = ROOT / "weather_runtime_cache.json"
 CURRENT_TTL_SECONDS = 600
 HISTORY_TTL_SECONDS = 900
@@ -39,6 +42,21 @@ TREND_TYPES = {
     "visibility": {"type": 13, "label": "能见度", "unit": "m"},
     "pressure": {"type": 14, "label": "气压", "unit": "hPa"},
 }
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+CWA_LIMIT = max(1, env_int("CWA_LIMIT", 1200))
+CWA_PAGE_LIMIT = max(1, env_int("CWA_PAGE_LIMIT", 80))
+CWA_MAX_PAGES = max(1, env_int("CWA_MAX_PAGES", 8))
+CWA_WORKERS = max(1, min(env_int("CWA_WORKERS", 6), 12))
+CWA_TIMEOUT_SECONDS = max(3, env_int("CWA_TIMEOUT_SECONDS", 12))
+CWA_RETRIES = max(1, min(env_int("CWA_RETRIES", 2), 4))
 
 
 def request_json(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -105,10 +123,23 @@ def fetch_cwa_json(resource_url: str, params: Dict[str, Any] | None = None) -> D
     if params:
         query.update({key: value for key, value in params.items() if value not in {"", None}})
     url = resource_url + "?" + urllib.parse.urlencode(query)
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        raw = response.read()
-    return json.loads(raw.decode("utf-8", errors="replace"))
+    request = urllib.request.Request(url, headers={"User-Agent": CWA_USER_AGENT, "Accept": "application/json"})
+    last_error: Exception | None = None
+    for _ in range(CWA_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=CWA_TIMEOUT_SECONDS) as response:
+                raw = response.read()
+            return json.loads(raw.decode("utf-8", errors="replace"))
+        except http.client.IncompleteRead as exc:
+            last_error = exc
+            raw = exc.partial or b""
+            try:
+                return json.loads(raw.decode("utf-8", errors="replace"))
+            except json.JSONDecodeError:
+                continue
+    if last_error:
+        raise last_error
+    raise RuntimeError("failed to fetch CWA data")
 
 
 def repair_text(value: Any) -> Any:
@@ -397,6 +428,7 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
     if include_taiwan:
         try:
             taiwan_rows = fetch_cached_cwa_observations()
+            errors.extend(CACHE.get("taiwan_cwa", {}).get("O-A0001-001", {}).get("errors", [])[:10])
             if keyword:
                 taiwan_rows = [
                     row for row in taiwan_rows
@@ -741,9 +773,43 @@ def fetch_cached_cwa_observations() -> List[Dict[str, Any]]:
     cached = cache.get("O-A0001-001")
     if isinstance(cached, dict) and cache_fresh(cached, CWA_TTL_SECONDS):
         return cached.get("data", [])
-    data = fetch_cwa_json(CWA_OBS_URL)
-    rows = normalize_cwa_observations(data)
-    cache["O-A0001-001"] = {"fetched_at_epoch": datetime.now().timestamp(), "data": rows}
+    rows = []
+    errors = []
+    executor = ThreadPoolExecutor(max_workers=CWA_WORKERS)
+    pages = min(CWA_MAX_PAGES, max(1, math.ceil(CWA_LIMIT / CWA_PAGE_LIMIT)))
+    futures = {
+        executor.submit(fetch_cwa_json, CWA_OBS_URL, {"limit": CWA_PAGE_LIMIT, "offset": page * CWA_PAGE_LIMIT}): page
+        for page in range(pages)
+    }
+    try:
+        completed = set()
+        try:
+            for future in as_completed(futures, timeout=CWA_TIMEOUT_SECONDS * CWA_RETRIES + 2):
+                completed.add(future)
+                page = futures[future]
+                try:
+                    rows.extend(normalize_cwa_observations(future.result()))
+                except Exception as exc:
+                    errors.append({"source": "taiwan_cwa", "page": page, "error": str(exc)})
+        except FuturesTimeoutError:
+            pass
+        for future, page in futures.items():
+            if future not in completed:
+                future.cancel()
+                errors.append({"source": "taiwan_cwa", "page": page, "error": "request timed out"})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+    deduped = {}
+    for row in rows:
+        deduped[row["station_id"]] = row
+    rows = list(deduped.values())
+    cache["O-A0001-001"] = {
+        "fetched_at_epoch": datetime.now().timestamp(),
+        "data": rows,
+        "errors": errors,
+    }
+    if errors and not rows:
+        raise RuntimeError("CWA page requests failed: " + "; ".join(f"page {item['page']} {item['error']}" for item in errors[:3]))
     return rows
 
 
