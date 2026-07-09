@@ -353,6 +353,20 @@ def list_weather_cities() -> Dict[str, Any]:
     }
 
 
+def list_taiwan_station_counts() -> Dict[str, Any]:
+    rows = read_cwa_station_index()
+    counts: Dict[str, int] = {}
+    for row in rows:
+        city = row.get("city") or "台湾"
+        counts[city] = counts.get(city, 0) + 1
+    counties = [{"name": name, "count": count} for name, count in sorted(counts.items(), key=lambda item: item[0])]
+    return {
+        "ok": True,
+        "counties": counties,
+        "total": len(rows),
+    }
+
+
 def normalize_city_name(city: str) -> str:
     city = str(city or "").strip()
     return city[:-1] if city.endswith("市") else city
@@ -1386,6 +1400,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(gis_current(query))
             elif parsed.path == "/api/weather-cities":
                 self.send_json(list_weather_cities())
+            elif parsed.path == "/api/taiwan-station-counts":
+                self.send_json(list_taiwan_station_counts())
             elif parsed.path == "/api/station-cache":
                 cache = get_station_cache()
                 self.send_json(
