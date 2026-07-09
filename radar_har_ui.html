@@ -538,6 +538,46 @@
     }
     .legend-labels span { color: var(--ink); font-weight: 700; }
     .legend-note { line-height: 1.45; }
+    .weather-rank-card {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 10px;
+    }
+    .weather-rank-card.show { display: grid; gap: 8px; }
+    .rank-board {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .rank-column { display: grid; gap: 6px; min-width: 0; }
+    .rank-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 900; }
+    .rank-list { display: grid; gap: 4px; }
+    .rank-row {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 7px;
+      border: 1px solid #edf1f4;
+      border-radius: 7px;
+      background: #fbfdfe;
+      font-size: 12px;
+    }
+    .rank-row button {
+      all: unset;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 800;
+    }
+    .rank-no { color: var(--muted); font-weight: 800; }
+    .rank-value { font-weight: 900; }
+    .rank-hot .rank-value { color: #dc2626; }
+    .rank-cold .rank-value { color: #2563eb; }
     .chip { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
     .feature-list, .trend-list { display: grid; gap: 8px; max-height: 260px; overflow: auto; }
     .feature {
@@ -759,6 +799,7 @@
         <div class="map-wrap">
           <div id="gisMap" class="map"></div>
           <div id="coordNote" class="muted" hidden></div>
+          <div id="weatherRank" class="weather-rank-card"></div>
           <div id="gisLegend" class="legend"></div>
         </div>
         <aside class="gis-side">
@@ -1112,6 +1153,7 @@
       renderLeafletGis(allowFit);
       renderGisListAndSelection();
       renderGisLegend();
+      renderWeatherRank();
     }
 
     function renderLeafletGis(allowFit) {
@@ -1179,6 +1221,46 @@
       $("gisHumidity").textContent = val(current?.humidity, "%");
       $("gisRain").textContent = val(current?.rainfall, "mm");
       $("gisWind").innerHTML = `<span class="main">${escapeHtml(shortWindDir(current?.wind_dir) || "-")}</span><span class="sub">${escapeHtml(val(current?.wind, "m/s"))}</span>`;
+    }
+
+    function renderWeatherRank() {
+      const box = $("weatherRank");
+      if ($("gisMetric").value !== "temperature") {
+        box.classList.remove("show");
+        box.innerHTML = "";
+        return;
+      }
+      const rows = state.gis.features
+        .map((feature) => {
+          const value = metricValue(feature, "temperature");
+          return { feature, value };
+        })
+        .filter((row) => Number.isFinite(row.value));
+      if (!rows.length) {
+        box.classList.remove("show");
+        box.innerHTML = "";
+        return;
+      }
+      const highest = [...rows].sort((a, b) => b.value - a.value).slice(0, 10);
+      const lowest = [...rows].sort((a, b) => a.value - b.value).slice(0, 10);
+      const rankRows = (items, kind) => items.map((row, index) => `
+        <div class="rank-row rank-${kind}">
+          <span class="rank-no">${index + 1}</span>
+          <button type="button" data-station="${escapeAttr(row.feature.station_id)}" title="${escapeAttr(row.feature.station_name || row.feature.name || row.feature.station_id)}">${escapeHtml(row.feature.station_name || row.feature.name || row.feature.station_id)}</button>
+          <span class="rank-value">${formatNumber(row.value)}°C</span>
+        </div>
+      `).join("");
+      box.classList.add("show");
+      box.innerHTML = `
+        <div class="rank-title"><span>气温排行榜</span><span class="muted">当前加载点位 ${rows.length} 个</span></div>
+        <div class="rank-board">
+          <div class="rank-column"><div class="rank-title"><span>最高 10 个</span></div><div class="rank-list">${rankRows(highest, "hot")}</div></div>
+          <div class="rank-column"><div class="rank-title"><span>最低 10 个</span></div><div class="rank-list">${rankRows(lowest, "cold")}</div></div>
+        </div>
+      `;
+      box.querySelectorAll("button[data-station]").forEach((button) => {
+        button.addEventListener("click", () => selectGisStation(button.dataset.station));
+      });
     }
 
     async function loadOfficialTrend(stationId) {
@@ -1623,12 +1705,18 @@
         temperature: {
           label: "气温",
           unit: "°C",
-          description: "低温 <20°C，舒适 20-30°C，偏热 30-35°C，高温 ≥35°C",
+          description: "气温色带覆盖 0-45°C，按冷暖使用高分离度颜色。",
           stops: [
-            { value: 15, tick: "<20°C", label: "低温", color: "#2563eb" },
-            { value: 25, tick: "20-30°C", label: "舒适", color: "#16a34a" },
-            { value: 32, tick: "30-35°C", label: "偏热", color: "#d5a21a" },
-            { value: 38, tick: "≥35°C", label: "高温", color: "#c2410c" },
+            { value: 0, tick: "0", label: "严寒", color: "#3b0764" },
+            { value: 5, tick: "5", label: "寒冷", color: "#1d4ed8" },
+            { value: 10, tick: "10", label: "偏冷", color: "#06b6d4" },
+            { value: 15, tick: "15", label: "清凉", color: "#22c55e" },
+            { value: 20, tick: "20", label: "舒适", color: "#a3e635" },
+            { value: 25, tick: "25", label: "温暖", color: "#fde047" },
+            { value: 30, tick: "30", label: "偏热", color: "#f97316" },
+            { value: 35, tick: "35", label: "炎热", color: "#dc2626" },
+            { value: 40, tick: "40", label: "高温", color: "#be123c" },
+            { value: 45, tick: "45", label: "极端", color: "#701a75" },
           ],
         },
         rainfall: {
