@@ -350,6 +350,10 @@ def normalize_city_name(city: str) -> str:
     return city[:-1] if city.endswith("市") else city
 
 
+def normalize_taiwan_name(name: str) -> str:
+    return str(name or "").strip().replace("台", "臺")
+
+
 def city_matches(row: Dict[str, Any], cities: List[str]) -> bool:
     if not cities:
         return True
@@ -363,7 +367,9 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
     limit = max(1, min(int(query.get("limit", ["600"])[0]), len(cache["obs_stations"])))
     realtime_limit = max(0, min(int(query.get("realtime_limit", ["240"])[0]), limit))
     hide_empty = query.get("hide_empty", ["0"])[0] in {"1", "true", "yes"}
+    include_fujian = query.get("include_fujian", ["1"])[0] in {"1", "true", "yes"}
     include_taiwan = query.get("include_taiwan", ["0"])[0] in {"1", "true", "yes"}
+    taiwan_counties = [item.strip() for item in query.get("taiwan_counties", [""])[0].split(",") if item.strip()]
     keyword = query.get("q", [""])[0].strip().lower()
     city = query.get("city", [""])[0].strip()
     cities = [item.strip() for item in query.get("cities", [""])[0].split(",") if item.strip()]
@@ -371,7 +377,7 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
         cities = [city]
     bbox_text = query.get("bbox", [""])[0]
 
-    rows = cache["obs_stations"]
+    rows = cache["obs_stations"] if include_fujian else []
     if cities:
         rows = [row for row in rows if city_matches(row, cities)]
     if keyword:
@@ -429,6 +435,12 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
         try:
             taiwan_rows = fetch_cached_cwa_observations()
             errors.extend(CACHE.get("taiwan_cwa", {}).get("O-A0001-001", {}).get("errors", [])[:10])
+            if taiwan_counties:
+                wanted = {normalize_taiwan_name(name) for name in taiwan_counties}
+                taiwan_rows = [
+                    row for row in taiwan_rows
+                    if normalize_taiwan_name(row.get("city", "")) in wanted
+                ]
             if keyword:
                 taiwan_rows = [
                     row for row in taiwan_rows
