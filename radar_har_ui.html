@@ -1186,7 +1186,7 @@
       const scope = selectedGisScope();
       const limit = Math.max(1, Number(scope?.count || 600));
       const params = new URLSearchParams({ limit: String(limit) });
-      const realtimeLimit = Math.min(limit, 120);
+      const realtimeLimit = Math.min(limit, 500);
       params.set("realtime_limit", String(realtimeLimit));
       params.set("hide_empty", "0");
       const includeFujian = scope?.includeFujian ?? scope?.source !== "taiwan";
