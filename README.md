@@ -155,3 +155,15 @@ Environment=CWA_API_KEY=你的CWA授权码
 ```
 
 未配置 `CWA_API_KEY` 时，福建数据仍会正常显示，台湾自动站不会加载。
+
+CWA 资料会按分页并发拉取，避免一次拉全量导致地图卡住。可选参数：
+
+```ini
+Environment=CWA_PAGE_LIMIT=80
+Environment=CWA_MAX_PAGES=8
+Environment=CWA_WORKERS=6
+Environment=CWA_TIMEOUT_SECONDS=12
+Environment=CWA_RETRIES=2
+```
+
+默认最多拉取约 `80 x 8 = 640` 条台湾自动站资料。CWA 的 `CountyName` 参数在该资料集上不稳定，服务端采用分页拉取后再按县市字段本地归类。
