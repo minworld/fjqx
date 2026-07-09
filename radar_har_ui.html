@@ -864,7 +864,7 @@
       weatherHistory: null,
       stationHistory: null,
       charts: {},
-      gis: { features: [], selectedStationId: null, cities: [], cityIndex: 0, map: null, markers: null, tileLayer: null, shouldFitBounds: true, baseMap: "amap" },
+      gis: { features: [], selectedStationId: null, cities: [], cityIndex: 0, map: null, markers: null, tileLayer: null, shouldFitBounds: true, baseMap: "amap", taiwanTotals: {}, displayCounts: {} },
     };
     const TAIWAN_COUNTIES = [
       "臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市",
@@ -1112,7 +1112,7 @@
         name: county,
         source: "taiwan",
         taiwanCounties: [county],
-        count: 80,
+        count: state.gis.taiwanTotals[county] || 0,
       }));
     }
 
@@ -1131,12 +1131,21 @@
     function renderGisCityControls() {
       const xiamenIndex = state.gis.cities.findIndex((city) => city.name === "厦门" || city.name === "鍘﹂棬");
       state.gis.cityIndex = xiamenIndex >= 0 ? xiamenIndex : Math.max(0, state.gis.cityIndex || 0);
-      $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(scope.label)}${scope.source === "taiwan" ? " · 台湾" : ` (${scope.count})`}</option>`).join("");
+      $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(regionLabel(scope))}</option>`).join("");
       $("gisRegionChecks").innerHTML = state.gis.cities.map((scope, index) => `
         <label class="region-check">
           <input type="checkbox" value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "checked" : ""}>
-          ${escapeHtml(scope.label)}${scope.source === "taiwan" ? " · 台湾" : ` (${scope.count})`}
+          ${escapeHtml(regionLabel(scope))}
         </label>`).join("");
+    }
+
+    function regionLabel(scope) {
+      if (scope.source === "taiwan") {
+        const shown = state.gis.displayCounts[scope.name] ?? 0;
+        const total = state.gis.taiwanTotals[scope.name] ?? scope.count;
+        return `${scope.label} (${shown}/${total || "-"})`;
+      }
+      return `${scope.label} (${scope.count})`;
     }
 
     async function loadGisCities() {
@@ -1144,7 +1153,11 @@
         state.gis.cities = [...buildFujianFallbackScopes(), ...buildTaiwanScopes()];
         renderGisCityControls();
       }
-      const data = await fetchJson("/api/weather-cities");
+      const [data, taiwanData] = await Promise.all([
+        fetchJson("/api/weather-cities"),
+        fetchJson("/api/taiwan-station-counts").catch(() => ({ counties: [] })),
+      ]);
+      state.gis.taiwanTotals = Object.fromEntries((taiwanData.counties || []).map((row) => [row.name, row.count]));
       const cityRows = data.cities || [];
       const cities = cityRows.map((city) => ({
         kind: "city",
@@ -1203,9 +1216,11 @@
       try {
         const data = await fetchJson(`/api/gis-current?${params}`);
         state.gis.features = data.features || [];
+        updateGisDisplayCounts();
         state.gis.selectedStationId = state.gis.features[0]?.station_id || null;
         state.stationHistory = null;
         state.gis.shouldFitBounds = true;
+        renderGisCityControls();
         renderGis(true);
       } catch (error) {
         showError(error);
@@ -1220,6 +1235,16 @@
       renderGisListAndSelection();
       renderGisLegend();
       renderWeatherRank();
+    }
+
+    function updateGisDisplayCounts() {
+      const counts = {};
+      for (const feature of state.gis.features || []) {
+        const key = feature.city || feature.area_name || "";
+        if (!key) continue;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      state.gis.displayCounts = counts;
     }
 
     function renderLeafletGis(allowFit) {
