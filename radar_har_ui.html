@@ -866,6 +866,12 @@
       charts: {},
       gis: { features: [], selectedStationId: null, cities: [], cityIndex: 0, map: null, markers: null, tileLayer: null, shouldFitBounds: true, baseMap: "amap" },
     };
+    const TAIWAN_COUNTIES = [
+      "臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市",
+      "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣",
+      "南投縣", "雲林縣", "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣",
+      "臺東縣", "澎湖縣", "金門縣", "連江縣",
+    ];
 
     $("refresh").addEventListener("click", () => state.mode === "gis" ? loadGis() : refreshLatest());
     $("radarSearch").addEventListener("click", () => { stopPlayback(); refreshLatest(); });
@@ -1102,17 +1108,27 @@
         value: `city:${city.name}`,
         label: city.name,
         name: city.name,
+        source: "fujian",
         cities: [city.name],
         count: city.count,
       }));
-      state.gis.cities = cities;
+      const taiwanScopes = TAIWAN_COUNTIES.map((county) => ({
+        kind: "taiwan_county",
+        value: `tw:${county}`,
+        label: county,
+        name: county,
+        source: "taiwan",
+        taiwanCounties: [county],
+        count: 80,
+      }));
+      state.gis.cities = [...cities, ...taiwanScopes];
       const xiamenIndex = Math.max(0, state.gis.cities.findIndex((city) => city.name === "厦门"));
       state.gis.cityIndex = xiamenIndex;
-      $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(scope.label)} (${scope.count})</option>`).join("");
+      $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(scope.label)}${scope.source === "taiwan" ? " · 台湾" : ` (${scope.count})`}</option>`).join("");
       $("gisRegionChecks").innerHTML = state.gis.cities.map((scope, index) => `
         <label class="region-check">
           <input type="checkbox" value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "checked" : ""}>
-          ${escapeHtml(scope.label)} (${scope.count})
+          ${escapeHtml(scope.label)}${scope.source === "taiwan" ? " · 台湾" : ` (${scope.count})`}
         </label>`).join("");
     }
 
@@ -1128,12 +1144,16 @@
       const scope = selectedGisScope();
       const limit = Math.max(1, Number(scope?.count || 600));
       const params = new URLSearchParams({ limit: String(limit) });
-      const realtimeLimit = Math.min(limit, 500);
+      const realtimeLimit = Math.min(limit, 120);
       params.set("realtime_limit", String(realtimeLimit));
       params.set("hide_empty", "1");
-      params.set("include_taiwan", "1");
+      const includeFujian = scope?.includeFujian ?? scope?.source !== "taiwan";
+      const includeTaiwan = scope?.includeTaiwan ?? scope?.source === "taiwan";
+      params.set("include_fujian", includeFujian ? "1" : "0");
+      params.set("include_taiwan", includeTaiwan ? "1" : "0");
       if (scope?.cities?.length === 1) params.set("city", scope.cities[0]);
       else if (scope?.cities?.length > 1) params.set("cities", scope.cities.join(","));
+      if (scope?.taiwanCounties?.length) params.set("taiwan_counties", scope.taiwanCounties.join(","));
       if ($("gisKeyword").value.trim()) params.set("q", $("gisKeyword").value.trim());
       $("gisRefresh").disabled = true;
       try {
@@ -1171,7 +1191,7 @@
       for (const feature of state.gis.features) {
         const lat = Number(feature.lat), lon = Number(feature.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        const displayCoord = displayLonLat(lon, lat);
+        const displayCoord = displayLonLat(lon, lat, feature);
         const value = metricValue(feature, metric);
         const active = feature.station_id === state.gis.selectedStationId;
         const size = metric === "wind" ? Math.max(22, Math.min(36, 20 + Number(value || 0) * 3)) : (active ? 22 : 15);
@@ -1618,7 +1638,8 @@
     }
     function findStation(id) { return state.groups.flatMap(groupStations).find((station) => String(station.station_id) === String(id)); }
     function selectedFeature() { return state.gis.features.find((f) => f.station_id === state.gis.selectedStationId) || state.gis.features[0]; }
-    function displayLonLat(lon, lat) {
+    function displayLonLat(lon, lat, feature = null) {
+      if (feature?.source === "taiwan_cwa") return { lon, lat };
       if (state.gis.baseMap === "amap") return wgs84ToGcj02(lon, lat);
       return { lon, lat };
     }
@@ -1658,15 +1679,20 @@
       const checkedScopes = state.gis.cities.filter((scope) => checkedValues.includes(scope.value));
       if (checkedScopes.length) {
         const citySet = new Set();
+        const taiwanSet = new Set();
         let count = 0;
         for (const scope of checkedScopes) {
           count += Number(scope.count || 0);
           for (const city of scope.cities || []) citySet.add(city);
+          for (const county of scope.taiwanCounties || []) taiwanSet.add(county);
         }
         return {
           value: checkedScopes.map((scope) => scope.value).join("+"),
           label: checkedScopes.map((scope) => scope.label).join(" + "),
           cities: Array.from(citySet),
+          taiwanCounties: Array.from(taiwanSet),
+          includeFujian: checkedScopes.some((scope) => scope.source !== "taiwan"),
+          includeTaiwan: checkedScopes.some((scope) => scope.source === "taiwan"),
           count,
         };
       }
