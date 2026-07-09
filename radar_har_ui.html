@@ -901,10 +901,10 @@
     $("gisCity").addEventListener("change", () => {
       $("gisRegionChecks").querySelectorAll("input").forEach((input) => { input.checked = false; });
       state.gis.cityIndex = Math.max(0, state.gis.cities.findIndex((scope) => scope.value === $("gisCity").value));
-      loadGis();
+      markGisSelectionPending();
     });
     $("gisRegionChecks").addEventListener("change", (event) => {
-      if (event.target.matches("input")) loadGis();
+      if (event.target.matches("input")) markGisSelectionPending();
     });
     $("gisPrev")?.addEventListener("click", () => stepGisCity(-1));
     $("gisNext")?.addEventListener("click", () => stepGisCity(1));
@@ -1173,7 +1173,12 @@
       if (!state.gis.cities.length) return;
       state.gis.cityIndex = (state.gis.cityIndex + offset + state.gis.cities.length) % state.gis.cities.length;
       $("gisCity").value = state.gis.cities[state.gis.cityIndex].value;
-      loadGis();
+      markGisSelectionPending();
+    }
+
+    function markGisSelectionPending() {
+      const button = $("gisRefresh");
+      if (!button.disabled) button.textContent = "确认加载";
     }
 
     async function loadGis() {
@@ -1206,7 +1211,7 @@
         showError(error);
       } finally {
         $("gisRefresh").disabled = false;
-        $("gisRefresh").textContent = previousRefreshText;
+        $("gisRefresh").textContent = "加载 GIS";
       }
     }
 
