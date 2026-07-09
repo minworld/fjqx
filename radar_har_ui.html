@@ -872,6 +872,10 @@
       "南投縣", "雲林縣", "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣",
       "臺東縣", "澎湖縣", "金門縣", "連江縣",
     ];
+    const FUJIAN_CITY_FALLBACK = [
+      ["三明", 389], ["南平", 372], ["厦门", 272], ["宁德", 304], ["平潭", 37],
+      ["泉州", 340], ["漳州", 355], ["福州", 355], ["莆田", 157], ["龙岩", 364],
+    ];
 
     $("refresh").addEventListener("click", () => state.mode === "gis" ? loadGis() : refreshLatest());
     $("radarSearch").addEventListener("click", () => { stopPlayback(); refreshLatest(); });
@@ -1112,8 +1116,20 @@
       }));
     }
 
+    function buildFujianFallbackScopes() {
+      return FUJIAN_CITY_FALLBACK.map(([name, count]) => ({
+        kind: "city",
+        value: `city:${name}`,
+        label: name,
+        name,
+        source: "fujian",
+        cities: [name],
+        count,
+      }));
+    }
+
     function renderGisCityControls() {
-      const xiamenIndex = state.gis.cities.findIndex((city) => city.name === "鍘﹂棬");
+      const xiamenIndex = state.gis.cities.findIndex((city) => city.name === "厦门" || city.name === "鍘﹂棬");
       state.gis.cityIndex = xiamenIndex >= 0 ? xiamenIndex : Math.max(0, state.gis.cityIndex || 0);
       $("gisCity").innerHTML = state.gis.cities.map((scope, index) => `<option value="${escapeAttr(scope.value)}" ${index === state.gis.cityIndex ? "selected" : ""}>${escapeHtml(scope.label)}${scope.source === "taiwan" ? " · 台湾" : ` (${scope.count})`}</option>`).join("");
       $("gisRegionChecks").innerHTML = state.gis.cities.map((scope, index) => `
@@ -1125,7 +1141,7 @@
 
     async function loadGisCities() {
       if (!state.gis.cities.length) {
-        state.gis.cities = buildTaiwanScopes();
+        state.gis.cities = [...buildFujianFallbackScopes(), ...buildTaiwanScopes()];
         renderGisCityControls();
       }
       const data = await fetchJson("/api/weather-cities");
@@ -1167,7 +1183,7 @@
       const params = new URLSearchParams({ limit: String(limit) });
       const realtimeLimit = Math.min(limit, 120);
       params.set("realtime_limit", String(realtimeLimit));
-      params.set("hide_empty", "1");
+      params.set("hide_empty", "0");
       const includeFujian = scope?.includeFujian ?? scope?.source !== "taiwan";
       const includeTaiwan = scope?.includeTaiwan ?? scope?.source === "taiwan";
       params.set("include_fujian", includeFujian ? "1" : "0");
@@ -1663,7 +1679,7 @@
     function findStation(id) { return state.groups.flatMap(groupStations).find((station) => String(station.station_id) === String(id)); }
     function selectedFeature() { return state.gis.features.find((f) => f.station_id === state.gis.selectedStationId) || state.gis.features[0]; }
     function displayLonLat(lon, lat, feature = null) {
-      if (feature?.source === "taiwan_cwa") return { lon, lat };
+      // AMap tiles use GCJ-02 across this region, while OSM/Esri use WGS84.
       if (state.gis.baseMap === "amap") return wgs84ToGcj02(lon, lat);
       return { lon, lat };
     }
