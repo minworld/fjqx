@@ -1131,6 +1131,7 @@
       const realtimeLimit = Math.min(limit, 500);
       params.set("realtime_limit", String(realtimeLimit));
       params.set("hide_empty", "1");
+      params.set("include_taiwan", "1");
       if (scope?.cities?.length === 1) params.set("city", scope.cities[0]);
       else if (scope?.cities?.length > 1) params.set("cities", scope.cities.join(","));
       if ($("gisKeyword").value.trim()) params.set("q", $("gisKeyword").value.trim());
