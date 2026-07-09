@@ -61,7 +61,7 @@ CWA_WORKERS = max(1, min(env_int("CWA_WORKERS", 4), 12))
 CWA_TIMEOUT_SECONDS = max(3, env_int("CWA_TIMEOUT_SECONDS", 12))
 CWA_STATION_TIMEOUT_SECONDS = max(15, env_int("CWA_STATION_TIMEOUT_SECONDS", 90))
 CWA_RETRIES = max(1, min(env_int("CWA_RETRIES", 2), 4))
-CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 30), 80))
+CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 80), 120))
 CWA_STATION_WORKERS = max(1, min(env_int("CWA_STATION_WORKERS", 4), 8))
 CWA_USE_BASIC_INDEX = os.environ.get("CWA_USE_BASIC_INDEX", "0") in {"1", "true", "yes"}
 
@@ -805,6 +805,8 @@ def fetch_cached_cwa_observations(target_counties: List[str] | None = None) -> L
         station_rows = [row for row in station_index if normalize_taiwan_name(row.get("city", "")) in wanted]
         if station_rows:
             rows, errors = fetch_cwa_station_observations(station_rows)
+            if not rows and isinstance(station_cached, dict) and station_cached.get("data"):
+                return station_cached.get("data", [])
             if not rows and station_rows:
                 rows = [
                     {
