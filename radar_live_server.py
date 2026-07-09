@@ -20,6 +20,8 @@ IMAGE_BASE = "http://www.fjqxfw.cn:8099/ftp/"
 FTP_BASE = "http://www.fjqxfw.cn:8099/ftp/"
 WEATHER_AREA_URL = FTP_BASE + "ztq_fj/ztq_area/and/lv3.json"
 OBS_STATION_URL = FTP_BASE + "ztq/ztq_area/and/2Fj_stations20260626102716.json"
+CWA_API_KEY = os.environ.get("CWA_API_KEY") or os.environ.get("CWB_API_KEY") or ""
+CWA_OBS_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
 TOKEN = "10002-45aad81b00cdfd743b1c6cdb8aaf2b9aef18ec05"
 USER_ID = "202309275065959"
 USER_AGENT = "zhi tian qi-jue ce/4.0.13 (iPhone; iOS 26.5; Scale/3.00)"
@@ -27,6 +29,7 @@ CACHE_FILE = ROOT / "weather_runtime_cache.json"
 CURRENT_TTL_SECONDS = 600
 HISTORY_TTL_SECONDS = 900
 STATION_TTL_SECONDS = 600
+CWA_TTL_SECONDS = 600
 CACHE: Dict[str, Any] = {"current_weather": {}, "station_history": {}, "weather_history": {}}
 TREND_TYPES = {
     "temperature": {"type": 11, "label": "气温", "unit": "°C"},
@@ -93,6 +96,19 @@ def fetch_url_json(url: str) -> Dict[str, Any]:
         raw = response.read()
     text = raw.decode("utf-8", errors="replace")
     return repair_text(json.loads(text))
+
+
+def fetch_cwa_json(resource_url: str, params: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if not CWA_API_KEY:
+        raise RuntimeError("CWA_API_KEY is not configured")
+    query = {"Authorization": CWA_API_KEY, "format": "JSON"}
+    if params:
+        query.update({key: value for key, value in params.items() if value not in {"", None}})
+    url = resource_url + "?" + urllib.parse.urlencode(query)
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        raw = response.read()
+    return json.loads(raw.decode("utf-8", errors="replace"))
 
 
 def repair_text(value: Any) -> Any:
@@ -316,6 +332,7 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
     limit = max(1, min(int(query.get("limit", ["600"])[0]), len(cache["obs_stations"])))
     realtime_limit = max(0, min(int(query.get("realtime_limit", ["240"])[0]), limit))
     hide_empty = query.get("hide_empty", ["0"])[0] in {"1", "true", "yes"}
+    include_taiwan = query.get("include_taiwan", ["0"])[0] in {"1", "true", "yes"}
     keyword = query.get("q", [""])[0].strip().lower()
     city = query.get("city", [""])[0].strip()
     cities = [item.strip() for item in query.get("cities", [""])[0].split(",") if item.strip()]
@@ -376,6 +393,29 @@ def gis_current(query: Dict[str, List[str]]) -> Dict[str, Any]:
                 "stats24h": summarize_local_history(row["station_id"]),
             }
         )
+
+    if include_taiwan:
+        try:
+            taiwan_rows = fetch_cached_cwa_observations()
+            if keyword:
+                taiwan_rows = [
+                    row for row in taiwan_rows
+                    if keyword in " ".join(str(row.get(field, "")) for field in ["station_id", "name", "city", "area_name"]).lower()
+                ]
+            if bbox:
+                min_lon, min_lat, max_lon, max_lat = bbox
+                taiwan_rows = [
+                    row for row in taiwan_rows
+                    if min_lon <= float(row["lon"]) <= max_lon and min_lat <= float(row["lat"]) <= max_lat
+                ]
+            if hide_empty:
+                taiwan_rows = [
+                    row for row in taiwan_rows
+                    if any(row.get(field) not in {"", None} for field in ["temperature", "humidity", "pressure", "wind"])
+                ]
+            features.extend(taiwan_rows)
+        except Exception as exc:
+            errors.append({"source": "taiwan_cwa", "error": str(exc)})
 
     features.sort(key=lambda item: (item.get("city", ""), item.get("name", "")))
     realtime_count = sum(1 for item in features if item.get("updated"))
@@ -694,6 +734,148 @@ def normalize_station_weather(data: Dict[str, Any], station: Dict[str, Any]) -> 
     if any(result.get(field) not in {"", None} for field in ["temperature", "humidity", "rainfall", "pressure", "wind"]):
         append_weather_snapshot(str(result["station_id"]), result)
     return result
+
+
+def fetch_cached_cwa_observations() -> List[Dict[str, Any]]:
+    cache = CACHE.setdefault("taiwan_cwa", {})
+    cached = cache.get("O-A0001-001")
+    if isinstance(cached, dict) and cache_fresh(cached, CWA_TTL_SECONDS):
+        return cached.get("data", [])
+    data = fetch_cwa_json(CWA_OBS_URL)
+    rows = normalize_cwa_observations(data)
+    cache["O-A0001-001"] = {"fetched_at_epoch": datetime.now().timestamp(), "data": rows}
+    return rows
+
+
+def normalize_cwa_observations(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    records = data.get("records", {}) if isinstance(data, dict) else {}
+    stations = records.get("Station") or records.get("station") or records.get("location") or []
+    rows = []
+    for station in stations:
+        if not isinstance(station, dict):
+            continue
+        row = normalize_cwa_station(station)
+        if row:
+            rows.append(row)
+    return rows
+
+
+def normalize_cwa_station(station: Dict[str, Any]) -> Dict[str, Any] | None:
+    station_id = str(first_value(station, ["StationId", "StationID", "stationId", "station_id", "locationName"]) or "").strip()
+    name = str(first_value(station, ["StationName", "stationName", "locationName"]) or station_id).strip()
+    geo = station.get("GeoInfo") or {}
+    weather = station.get("WeatherElement") or {}
+    lat, lon = cwa_lat_lon(station, geo)
+    if lat is None or lon is None:
+        return None
+    obs_time = first_value(station.get("ObsTime") or {}, ["DateTime", "obsTime"])
+    if not obs_time:
+        obs_time = first_value(station, ["DateTime", "time", "obsTime"])
+    county = first_value(geo, ["CountyName", "countyName"]) or first_value(station, ["CountyName", "countyName"])
+    town = first_value(geo, ["TownName", "townName"]) or first_value(station, ["TownName", "townName"])
+    wind_dir_value = cwa_value(weather, "WindDirection", station)
+    current = {
+        "area": "taiwan",
+        "station_id": f"TW:{station_id}" if station_id else f"TW:{name}",
+        "station_name": name,
+        "city": county or "台湾",
+        "updated": obs_time or "",
+        "temperature": cwa_metric(cwa_value(weather, "AirTemperature", station)),
+        "humidity": cwa_metric(cwa_value(weather, "RelativeHumidity", station)),
+        "rainfall": cwa_metric(cwa_value(weather, "Precipitation", station)),
+        "pressure": cwa_metric(cwa_value(weather, "AirPressure", station)),
+        "wind": cwa_metric(cwa_value(weather, "WindSpeed", station)),
+        "wind_dir": cwa_wind_dir(wind_dir_value),
+        "weather": cwa_value(weather, "Weather", station) or "",
+        "lon": lon,
+        "lat": lat,
+        "raw": station,
+    }
+    return {
+        "source": "taiwan_cwa",
+        "kind": "taiwan_auto_station",
+        "area_id": "taiwan",
+        "station_id": current["station_id"],
+        "name": name,
+        "city": county or "台湾",
+        "area_name": town or county or "台湾",
+        "lon": lon,
+        "lat": lat,
+        "updated": current["updated"],
+        "temperature": current["temperature"],
+        "humidity": current["humidity"],
+        "rainfall": current["rainfall"],
+        "pressure": current["pressure"],
+        "wind": current["wind"],
+        "wind_dir": current["wind_dir"],
+        "current": current,
+        "stats24h": {},
+    }
+
+
+def cwa_lat_lon(station: Dict[str, Any], geo: Dict[str, Any]) -> tuple[Any, Any]:
+    lat = parse_float(first_value(station, ["StationLatitude", "lat", "latitude"]))
+    lon = parse_float(first_value(station, ["StationLongitude", "lon", "longitude"]))
+    if lat is not None and lon is not None:
+        return lat, lon
+    lat = parse_float(first_value(geo, ["StationLatitude", "lat", "latitude"]))
+    lon = parse_float(first_value(geo, ["StationLongitude", "lon", "longitude"]))
+    if lat is not None and lon is not None:
+        return lat, lon
+    for coord in geo.get("Coordinates", []) or []:
+        lat = parse_float(first_value(coord, ["StationLatitude", "lat", "latitude"]))
+        lon = parse_float(first_value(coord, ["StationLongitude", "lon", "longitude"]))
+        if lat is not None and lon is not None:
+            return lat, lon
+    return None, None
+
+
+def first_value(data: Dict[str, Any], keys: List[str]) -> Any:
+    if not isinstance(data, dict):
+        return None
+    for key in keys:
+        if data.get(key) not in {"", None}:
+            return data.get(key)
+    return None
+
+
+def cwa_value(weather: Any, key: str, station: Dict[str, Any]) -> Any:
+    if isinstance(weather, dict):
+        value = weather.get(key)
+        if isinstance(value, dict):
+            if key == "Precipitation":
+                value = value.get("Now", value)
+            return first_value(value, ["Value", "value", "Precipitation", "AirTemperature", "WindSpeed", "WindDirection"])
+        if value not in {"", None}:
+            return value
+    if isinstance(weather, list):
+        for item in weather:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("elementName") or item.get("ElementName") or item.get("name")
+            if name == key:
+                value = item.get("elementValue") or item.get("ElementValue") or item.get("value")
+                if isinstance(value, list) and value:
+                    value = value[0]
+                if isinstance(value, dict):
+                    return first_value(value, ["value", "Value", "measures"])
+                return value
+    return first_value(station, [key, key[0].lower() + key[1:]])
+
+
+def cwa_metric(value: Any) -> Any:
+    parsed = parse_float(value)
+    if parsed is None or parsed <= -90:
+        return ""
+    return parsed
+
+
+def cwa_wind_dir(value: Any) -> str:
+    parsed = parse_float(value)
+    if parsed is None:
+        return str(value or "")
+    directions = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
+    return directions[int((parsed + 22.5) // 45) % 8]
 
 
 def fetch_station_trend(station_id: str, metric: str) -> Dict[str, Any]:
