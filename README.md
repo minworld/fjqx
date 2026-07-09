@@ -131,3 +131,27 @@ server {
 - 前端 CDN：Leaflet、ECharts
 
 运行时缓存写入 `weather_runtime_cache.json`。Docker 镜像默认不打包该缓存文件。
+
+## 台湾 CWA 自动气象站
+
+气象地图支持叠加台湾中央氣象署 CWA 自动气象站资料。该接口需要开放资料授权码：
+
+1. 打开 https://opendata.cwa.gov.tw/
+2. 注册并登录气象会员。
+3. 进入“API 授权码”，取得授权码。
+4. 启动服务前设置环境变量 `CWA_API_KEY`。
+
+PowerShell：
+
+```powershell
+$env:CWA_API_KEY="你的CWA授权码"
+.\.venv\Scripts\python.exe .\radar_weather_app\radar_live_server.py --host 0.0.0.0 --port 8765
+```
+
+Linux/systemd 可在服务里加入：
+
+```ini
+Environment=CWA_API_KEY=你的CWA授权码
+```
+
+未配置 `CWA_API_KEY` 时，福建数据仍会正常显示，台湾自动站不会加载。
