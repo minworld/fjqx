@@ -1,20 +1,25 @@
 {
-  "saved_at": "2026-07-09 13:34:50",
-  "count": 824,
+  "saved_at": "2026-07-09 13:完整补齐",
+  "count": 874,
   "pages_done": [
     0,
     1,
     2,
     3,
+    4,
     5,
     6,
+    7,
     8,
     9,
     10,
     11,
     12,
     13,
+    14,
     15,
+    16,
+    17,
     18,
     19,
     20
@@ -63,6 +68,17 @@
       "area_name": "魚池鄉",
       "lon": 120.955222,
       "lat": 23.904982
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0I390",
+      "name": "仁愛",
+      "city": "南投縣",
+      "area_name": "仁愛鄉",
+      "lon": 121.124056,
+      "lat": 24.023903
     },
     {
       "source": "taiwan_cwa",
@@ -129,6 +145,17 @@
       "area_name": "仁愛鄉",
       "lon": 120.991946,
       "lat": 23.889672
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0I460",
+      "name": "南投",
+      "city": "南投縣",
+      "area_name": "南投市",
+      "lon": 120.679183,
+      "lat": 23.913208
     },
     {
       "source": "taiwan_cwa",
@@ -321,6 +348,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0HA20",
+      "name": "杉林溪大飯店",
+      "city": "南投縣",
+      "area_name": "竹山鎮",
+      "lon": 120.783158,
+      "lat": 23.63604
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C2H9Y0",
       "name": "松茗",
       "city": "南投縣",
@@ -448,6 +486,17 @@
       "area_name": "中寮鄉",
       "lon": 120.83263,
       "lat": 23.8953
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0I110",
+      "name": "竹山",
+      "city": "南投縣",
+      "area_name": "竹山鎮",
+      "lon": 120.677778,
+      "lat": 23.764722
     },
     {
       "source": "taiwan_cwa",
@@ -607,6 +656,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0I370",
+      "name": "魚池",
+      "city": "南投縣",
+      "area_name": "魚池鄉",
+      "lon": 120.933219,
+      "lat": 23.897478
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C2I090",
       "name": "鳳凰",
       "city": "南投縣",
@@ -624,6 +684,17 @@
       "area_name": "鹿谷鄉",
       "lon": 120.779931,
       "lat": 23.76569
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0H9Z0",
+      "name": "鹿林山",
+      "city": "南投縣",
+      "area_name": "信義鄉",
+      "lon": 120.86517,
+      "lat": 23.47046
     },
     {
       "source": "taiwan_cwa",
@@ -954,6 +1025,17 @@
       "area_name": "義竹鄉",
       "lon": 120.199941,
       "lat": 23.352086
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0M750",
+      "name": "布袋",
+      "city": "嘉義縣",
+      "area_name": "布袋鎮",
+      "lon": 120.159667,
+      "lat": 23.382611
     },
     {
       "source": "taiwan_cwa",
@@ -1443,6 +1525,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0U890",
+      "name": "三星",
+      "city": "宜蘭縣",
+      "area_name": "三星鄉",
+      "lon": 121.644819,
+      "lat": 24.669917
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C2UC40",
       "name": "中城",
       "city": "宜蘭縣",
@@ -1916,6 +2009,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0U860",
+      "name": "頭城",
+      "city": "宜蘭縣",
+      "area_name": "頭城鎮",
+      "lon": 121.822586,
+      "lat": 24.855031
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0UA10",
       "name": "鴛鴦湖",
       "city": "宜蘭縣",
@@ -2153,6 +2257,17 @@
       "area_name": "恆春鎮",
       "lon": 120.802258,
       "lat": 21.968561
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0R620",
+      "name": "墾雷",
+      "city": "屏東縣",
+      "area_name": "恆春鎮",
+      "lon": 120.847244,
+      "lat": 21.90265
     },
     {
       "source": "taiwan_cwa",
@@ -2752,6 +2867,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0R710",
+      "name": "龍磐",
+      "city": "屏東縣",
+      "area_name": "恆春鎮",
+      "lon": 120.830933,
+      "lat": 21.933481
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0G970",
       "name": "三豐",
       "city": "彰化縣",
@@ -2912,6 +3038,17 @@
       "area_name": "埔鹽鄉",
       "lon": 120.423583,
       "lat": 24.002167
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0G830",
+      "name": "埤頭",
+      "city": "彰化縣",
+      "area_name": "埤頭鄉",
+      "lon": 120.444722,
+      "lat": 23.867806
     },
     {
       "source": "taiwan_cwa",
@@ -3082,6 +3219,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0G940",
+      "name": "竹塘",
+      "city": "彰化縣",
+      "area_name": "竹塘鄉",
+      "lon": 120.378628,
+      "lat": 23.85
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0G900",
       "name": "線西",
       "city": "彰化縣",
@@ -3170,6 +3318,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0G950",
+      "name": "防潮門",
+      "city": "彰化縣",
+      "area_name": "伸港鄉",
+      "lon": 120.478972,
+      "lat": 24.185242
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C2G640",
       "name": "鹿港",
       "city": "彰化縣",
@@ -3209,6 +3368,17 @@
       "area_name": "貢寮區",
       "lon": 121.993889,
       "lat": 25.009444
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0AI30",
+      "name": "三重",
+      "city": "新北市",
+      "area_name": "三重區",
+      "lon": 121.4924,
+      "lat": 25.059108
     },
     {
       "source": "taiwan_cwa",
@@ -3275,6 +3445,17 @@
       "area_name": "八里區",
       "lon": 121.395306,
       "lat": 25.15225
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0AJ60",
+      "name": "六塊厝",
+      "city": "新北市",
+      "area_name": "淡水區",
+      "lon": 121.439863,
+      "lat": 25.241776
     },
     {
       "source": "taiwan_cwa",
@@ -3594,6 +3775,17 @@
       "area_name": "汐止區",
       "lon": 121.650556,
       "lat": 25.068667
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0A550",
+      "name": "泰平",
+      "city": "新北市",
+      "area_name": "雙溪區",
+      "lon": 121.815278,
+      "lat": 24.973056
     },
     {
       "source": "taiwan_cwa",
@@ -4622,6 +4814,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0W190",
+      "name": "望安",
+      "city": "澎湖縣",
+      "area_name": "望安鄉",
+      "lon": 119.485981,
+      "lat": 23.382282
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:467300",
       "name": "東吉島",
       "city": "澎湖縣",
@@ -4897,12 +5100,34 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0F9Q0",
+      "name": "外埔",
+      "city": "臺中市",
+      "area_name": "外埔區",
+      "lon": 120.697472,
+      "lat": 24.349556
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0F970",
       "name": "大坑",
       "city": "臺中市",
       "area_name": "北屯區",
       "lon": 120.714139,
       "lat": 24.174889
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0F9K0",
+      "name": "大安",
+      "city": "臺中市",
+      "area_name": "大安區",
+      "lon": 120.579972,
+      "lat": 24.347444
     },
     {
       "source": "taiwan_cwa",
@@ -4985,6 +5210,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0F0D0",
+      "name": "審馬陣",
+      "city": "臺中市",
+      "area_name": "和平區",
+      "lon": 121.412122,
+      "lat": 24.383461
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0FA80",
       "name": "小雪山天池",
       "city": "臺中市",
@@ -5024,6 +5260,17 @@
       "area_name": "新社區",
       "lon": 120.8075,
       "lat": 24.201583
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0F850",
+      "name": "東勢",
+      "city": "臺中市",
+      "area_name": "東勢區",
+      "lon": 120.824917,
+      "lat": 24.248194
     },
     {
       "source": "taiwan_cwa",
@@ -5139,6 +5386,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0F0B0",
+      "name": "石岡",
+      "city": "臺中市",
+      "area_name": "石岡區",
+      "lon": 120.769478,
+      "lat": 24.277822
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0F9I0",
       "name": "神岡",
       "city": "臺中市",
@@ -5178,6 +5436,17 @@
       "area_name": "龍井區",
       "lon": 120.482584,
       "lat": 24.216388
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0F9T0",
+      "name": "西屯",
+      "city": "臺中市",
+      "area_name": "西屯區",
+      "lon": 120.632861,
+      "lat": 24.182028
     },
     {
       "source": "taiwan_cwa",
@@ -5244,6 +5513,28 @@
       "area_name": "和平區",
       "lon": 120.9704,
       "lat": 24.2336
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0FA50",
+      "name": "霧峰",
+      "city": "臺中市",
+      "area_name": "霧峰區",
+      "lon": 120.691323,
+      "lat": 24.043658
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0FA60",
+      "name": "鞍馬山工作站",
+      "city": "臺中市",
+      "area_name": "和平區",
+      "lon": 120.9926,
+      "lat": 24.2681
     },
     {
       "source": "taiwan_cwa",
@@ -5343,6 +5634,17 @@
       "area_name": "北投區",
       "lon": 121.514167,
       "lat": 25.177333
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0A9C0",
+      "name": "天母",
+      "city": "臺北市",
+      "area_name": "士林區",
+      "lon": 121.528939,
+      "lat": 25.119253
     },
     {
       "source": "taiwan_cwa",
@@ -5975,6 +6277,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0X210",
+      "name": "白河",
+      "city": "臺南市",
+      "area_name": "白河區",
+      "lon": 120.406328,
+      "lat": 23.349228
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:467410",
       "name": "臺南",
       "city": "臺南市",
@@ -6080,6 +6393,17 @@
       "area_name": "官田區",
       "lon": 120.327209,
       "lat": 23.191241
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0X140",
+      "name": "西港",
+      "city": "臺南市",
+      "area_name": "西港區",
+      "lon": 120.195083,
+      "lat": 23.127417
     },
     {
       "source": "taiwan_cwa",
@@ -6305,6 +6629,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0SA80",
+      "name": "土坂",
+      "city": "臺東縣",
+      "area_name": "達仁鄉",
+      "lon": 120.879528,
+      "lat": 22.454908
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:467540",
       "name": "大武",
       "city": "臺東縣",
@@ -6355,6 +6690,17 @@
       "area_name": "太麻里鄉",
       "lon": 120.9897,
       "lat": 22.599802
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0SD20",
+      "name": "富山",
+      "city": "臺東縣",
+      "area_name": "卑南鄉",
+      "lon": 121.182756,
+      "lat": 22.82419
     },
     {
       "source": "taiwan_cwa",
@@ -6597,6 +6943,17 @@
       "area_name": "海端鄉",
       "lon": 121.11777,
       "lat": 23.070902
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0S730",
+      "name": "綠島",
+      "city": "臺東縣",
+      "area_name": "綠島鄉",
+      "lon": 121.467267,
+      "lat": 22.669025
     },
     {
       "source": "taiwan_cwa",
@@ -6965,6 +7322,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0TA50",
+      "name": "和仁",
+      "city": "花蓮縣",
+      "area_name": "秀林鄉",
+      "lon": 121.704304,
+      "lat": 24.243199
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0Z230",
       "name": "和平",
       "city": "花蓮縣",
@@ -7037,6 +7405,17 @@
       "area_name": "秀林鄉",
       "lon": 121.621542,
       "lat": 24.149236
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0Z080",
+      "name": "富源",
+      "city": "花蓮縣",
+      "area_name": "光復鄉",
+      "lon": 121.370389,
+      "lat": 23.58975
     },
     {
       "source": "taiwan_cwa",
@@ -7174,6 +7553,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0Z310",
+      "name": "清水斷崖",
+      "city": "花蓮縣",
+      "area_name": "秀林鄉",
+      "lon": 121.680972,
+      "lat": 24.2201
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0Z320",
       "name": "清水林道",
       "city": "花蓮縣",
@@ -7224,6 +7614,17 @@
       "area_name": "秀林鄉",
       "lon": 121.3873,
       "lat": 24.0168
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0TA40",
+      "name": "秀林",
+      "city": "花蓮縣",
+      "area_name": "秀林鄉",
+      "lon": 121.722972,
+      "lat": 24.304668
     },
     {
       "source": "taiwan_cwa",
@@ -7757,12 +8158,34 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0E830",
+      "name": "苑裡",
+      "city": "苗栗縣",
+      "area_name": "苑裡鎮",
+      "lon": 120.644883,
+      "lat": 24.441458
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:K2E710",
       "name": "苗改生物防治研究中心",
       "city": "苗栗縣",
       "area_name": "大湖鄉",
       "lon": 120.863657,
       "lat": 24.42463
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0E750",
+      "name": "苗栗",
+      "city": "苗栗縣",
+      "area_name": "苗栗市",
+      "lon": 120.816444,
+      "lat": 24.566667
     },
     {
       "source": "taiwan_cwa",
@@ -7851,6 +8274,17 @@
       "area_name": "造橋鄉",
       "lon": 120.856583,
       "lat": 24.63875
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0E780",
+      "name": "銅鑼",
+      "city": "苗栗縣",
+      "area_name": "銅鑼鄉",
+      "lon": 120.782639,
+      "lat": 24.491528
     },
     {
       "source": "taiwan_cwa",
@@ -7983,6 +8417,28 @@
       "area_name": "烏坵鄉",
       "lon": 119.441347,
       "lat": 24.996081
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0W150",
+      "name": "金寧",
+      "city": "金門縣",
+      "area_name": "金寧鄉",
+      "lon": 118.320831,
+      "lat": 24.459339
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0W140",
+      "name": "金沙",
+      "city": "金門縣",
+      "area_name": "金沙鎮",
+      "lon": 118.400617,
+      "lat": 24.489931
     },
     {
       "source": "taiwan_cwa",
@@ -8230,6 +8686,28 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0K560",
+      "name": "棋山",
+      "city": "雲林縣",
+      "area_name": "古坑鄉",
+      "lon": 120.595289,
+      "lat": 23.688211
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0K510",
+      "name": "水林",
+      "city": "雲林縣",
+      "area_name": "水林鄉",
+      "lon": 120.237839,
+      "lat": 23.574658
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:A2K360",
       "name": "水試臺西試驗場",
       "city": "雲林縣",
@@ -8269,6 +8747,17 @@
       "area_name": "口湖鄉",
       "lon": 120.13192,
       "lat": 23.621487
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0K530",
+      "name": "臺西",
+      "city": "雲林縣",
+      "area_name": "臺西鄉",
+      "lon": 120.189422,
+      "lat": 23.703283
     },
     {
       "source": "taiwan_cwa",
@@ -8324,6 +8813,17 @@
       "area_name": "水林鄉",
       "lon": 120.221625,
       "lat": 23.516064
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0K330",
+      "name": "虎尾",
+      "city": "雲林縣",
+      "area_name": "虎尾鎮",
+      "lon": 120.433911,
+      "lat": 23.720939
     },
     {
       "source": "taiwan_cwa",
@@ -8560,6 +9060,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0V370",
+      "name": "古亭坑",
+      "city": "高雄市",
+      "area_name": "田寮區",
+      "lon": 120.393889,
+      "lat": 22.895
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C2V570",
       "name": "吉東",
       "city": "高雄市",
@@ -8736,12 +9247,34 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0V210",
+      "name": "復興",
+      "city": "高雄市",
+      "area_name": "桃源區",
+      "lon": 120.797778,
+      "lat": 23.224167
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:E2P990",
       "name": "扇平林試",
       "city": "高雄市",
       "area_name": "茂林區",
       "lon": 120.677627,
       "lat": 22.969481
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0V870",
+      "name": "文安",
+      "city": "高雄市",
+      "area_name": "彌陀區",
+      "lon": 120.208308,
+      "lat": 22.804288
     },
     {
       "source": "taiwan_cwa",
@@ -8934,6 +9467,17 @@
       "source": "taiwan_cwa",
       "kind": "taiwan_auto_station",
       "area_id": "taiwan",
+      "station_id": "TW:C0V710",
+      "name": "苓雅",
+      "city": "高雄市",
+      "area_name": "苓雅區",
+      "lon": 120.322583,
+      "lat": 22.624528
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
       "station_id": "TW:C0V630",
       "name": "茄萣",
       "city": "高雄市",
@@ -8962,6 +9506,17 @@
       "area_name": "梓官區",
       "lon": 120.244618,
       "lat": 22.727414
+    },
+    {
+      "source": "taiwan_cwa",
+      "kind": "taiwan_auto_station",
+      "area_id": "taiwan",
+      "station_id": "TW:C0V960",
+      "name": "西阿里關山",
+      "city": "高雄市",
+      "area_name": "甲仙區",
+      "lon": 120.63334,
+      "lat": 23.18479
     },
     {
       "source": "taiwan_cwa",
