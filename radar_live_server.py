@@ -61,8 +61,8 @@ CWA_WORKERS = max(1, min(env_int("CWA_WORKERS", 4), 12))
 CWA_TIMEOUT_SECONDS = max(3, env_int("CWA_TIMEOUT_SECONDS", 12))
 CWA_STATION_TIMEOUT_SECONDS = max(15, env_int("CWA_STATION_TIMEOUT_SECONDS", 90))
 CWA_RETRIES = max(1, min(env_int("CWA_RETRIES", 2), 4))
-CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 80), 120))
-CWA_STATION_WORKERS = max(1, min(env_int("CWA_STATION_WORKERS", 4), 8))
+CWA_STATION_CHUNK = max(1, min(env_int("CWA_STATION_CHUNK", 5), 120))
+CWA_STATION_WORKERS = max(1, min(env_int("CWA_STATION_WORKERS", 8), 8))
 CWA_USE_BASIC_INDEX = os.environ.get("CWA_USE_BASIC_INDEX", "0") in {"1", "true", "yes"}
 
 
@@ -808,15 +808,17 @@ def fetch_cached_cwa_observations(target_counties: List[str] | None = None) -> L
     cached = cache.get("O-A0001-001")
     if isinstance(cached, dict) and cache_fresh(cached, CWA_TTL_SECONDS):
         rows = cached.get("data", [])
-        if not wanted or cwa_rows_cover_counties(rows, wanted):
+        if not wanted or (cwa_rows_cover_counties(rows, wanted) and not target_counties):
             return rows
     if wanted:
         station_cache_key = ",".join(sorted(wanted))
-        station_cached = CACHE.setdefault("taiwan_station_current", {}).get(station_cache_key)
-        if isinstance(station_cached, dict) and cache_fresh(station_cached, CWA_TTL_SECONDS):
-            return station_cached.get("data", [])
         station_index = load_cwa_station_index(wanted)
         station_rows = [row for row in station_index if normalize_taiwan_name(row.get("city", "")) in wanted]
+        station_cached = CACHE.setdefault("taiwan_station_current", {}).get(station_cache_key)
+        if isinstance(station_cached, dict) and cache_fresh(station_cached, CWA_TTL_SECONDS):
+            cached_rows = station_cached.get("data", [])
+            if len(cached_rows) >= len(station_rows):
+                return cached_rows
         if station_rows:
             rows, errors = fetch_cwa_station_observations(station_rows)
             if not rows and isinstance(station_cached, dict) and station_cached.get("data"):
@@ -846,6 +848,33 @@ def fetch_cached_cwa_observations(target_counties: List[str] | None = None) -> L
                     }
                     for row in station_rows
                 ]
+            elif rows and len(rows) < len(station_rows):
+                returned_ids = {row.get("station_id") for row in rows}
+                rows.extend(
+                    {
+                        **row,
+                        "updated": "",
+                        "temperature": "",
+                        "humidity": "",
+                        "rainfall": "",
+                        "pressure": "",
+                        "wind": "",
+                        "wind_dir": "",
+                        "current": {
+                            **row,
+                            "updated": "",
+                            "temperature": "",
+                            "humidity": "",
+                            "rainfall": "",
+                            "pressure": "",
+                            "wind": "",
+                            "wind_dir": "",
+                        },
+                        "stats24h": {},
+                    }
+                    for row in station_rows
+                    if row.get("station_id") not in returned_ids
+                )
             if rows:
                 CACHE.setdefault("taiwan_station_current", {})[station_cache_key] = {
                     "fetched_at_epoch": datetime.now().timestamp(),
@@ -1001,6 +1030,7 @@ def fetch_cwa_station_observations(station_rows: List[Dict[str, Any]]) -> tuple[
     errors = []
     ids = [str(row.get("station_id", "")).replace("TW:", "") for row in station_rows if row.get("station_id")]
     chunks = chunked(ids, CWA_STATION_CHUNK)
+    failed_chunks: List[List[str]] = []
     executor = ThreadPoolExecutor(max_workers=CWA_STATION_WORKERS)
     futures = {
         executor.submit(fetch_cwa_station_chunk, chunk): chunk
@@ -1017,6 +1047,7 @@ def fetch_cwa_station_observations(station_rows: List[Dict[str, Any]]) -> tuple[
                     rows.extend(future.result())
                 except Exception as exc:
                     errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": str(exc)})
+                    failed_chunks.append(chunk)
         except FuturesTimeoutError:
             pass
         for future, chunk in futures.items():
@@ -1025,12 +1056,49 @@ def fetch_cwa_station_observations(station_rows: List[Dict[str, Any]]) -> tuple[
                 errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk[:5]), "error": "station request timed out"})
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
+    if failed_chunks:
+        retry_rows, retry_errors = fetch_cwa_station_retry_chunks(failed_chunks)
+        rows.extend(retry_rows)
+        if retry_rows:
+            retry_ids = {row.get("station_id", "").replace("TW:", "") for row in retry_rows}
+            errors = [
+                error for error in errors
+                if not any(station_id in retry_ids for station_id in str(error.get("station_ids", "")).split(","))
+            ]
+        errors.extend(retry_errors)
     return rows, errors
 
 
 def fetch_cwa_station_chunk(chunk: List[str]) -> List[Dict[str, Any]]:
     data = fetch_cwa_json(CWA_OBS_URL, {"StationId": ",".join(chunk), "limit": len(chunk)}, timeout=CWA_TIMEOUT_SECONDS)
     return normalize_cwa_observations(data)
+
+
+def fetch_cwa_station_retry_chunks(failed_chunks: List[List[str]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    retry_chunks = [[station_id] for chunk in failed_chunks for station_id in chunk]
+    rows = []
+    errors = []
+    executor = ThreadPoolExecutor(max_workers=CWA_STATION_WORKERS)
+    futures = {executor.submit(fetch_cwa_station_chunk, chunk): chunk for chunk in retry_chunks}
+    completed = set()
+    try:
+        try:
+            for future in as_completed(futures, timeout=30):
+                completed.add(future)
+                chunk = futures[future]
+                try:
+                    rows.extend(future.result())
+                except Exception as exc:
+                    errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk), "error": str(exc)})
+        except FuturesTimeoutError:
+            pass
+        for future, chunk in futures.items():
+            if future not in completed:
+                future.cancel()
+                errors.append({"source": "taiwan_cwa", "station_ids": ",".join(chunk), "error": "station retry timed out"})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+    return rows, errors
 
 
 def chunked(items: List[str], size: int) -> List[List[str]]:
